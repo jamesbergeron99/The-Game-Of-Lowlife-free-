@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const logo = document.getElementById('logo');
   logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
 
-  /* ===== 100 BOARD SQUARES (79 original + 21 new) ===== */
+  /* ===== 100 BOARD SQUARES ===== */
   const EVENTS = [
     'Start',
     'High school pregnancy, gain a family member',
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'High on meth. Speed ahead two places.',
     'Tard card',
     'Bankruptcy. Spin 9 to avoid total ruin.',
-    /* ---- 79 → 100: NEW SQUARES ADDED BACK ---- */
+    /* ---- new squares to reach 100 ---- */
     'Payday',
     'Tard card',
     'Identity theft',
@@ -230,9 +230,9 @@ document.addEventListener('DOMContentLoaded', () => {
     'Arrested for jaywalking, pay $150',
     'Finish, $5,000 to the first person who crosses.'
   ];
-  const N_SQUARES = EVENTS.length; // should be 100
+  const N_SQUARES = EVENTS.length; // = 100
 
-  /* ===== TARD DECK restored (from your PDF vibe) + 10 payoff cards ===== */
+  /* ===== TARD DECK (incl. 10 payoff cards) ===== */
   const TARD_CARDS = [
     'Grandma Joined a Cult – She ran off with a man named Moonbeam. Lose 1 family member.',
     'Dad Arrested in the Dominican Republic – “It was just one drink!” Lose 1 family member.',
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'Power Outage Party – Host the block. Gain one social connection and $100.',
     'STD Scare – Lose a turn and your dignity.',
     'Eviction Notice – Move back home. Lose your apartment, gain one family member.',
-    /* +10 payoff cards restored */
+    /* +10 payoff cards */
     'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
     'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
     'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
@@ -480,36 +480,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Landing on PAYDAY = base pay (once) + $1,000 bonus
   function landingPayday(p,summary){
-    crossPayday(p,summary);            // base pay exactly once
-    moneyDelta(p,1000);                // landing bonus
-    summary.push('Landing bonus: +$1,000.');
-    log(`${p.name} lands on PAYDAY. +$1,000 bonus.`);
+    moneyDelta(p,p.character.payday); // base pay ONCE for the landing
+    moneyDelta(p,1000);               // landing bonus
+    summary.push(`Landed on PAYDAY: +$${p.character.payday.toLocaleString()} + $1,000 bonus.`);
+    log(`${p.name} lands on PAYDAY. +$${p.character.payday.toLocaleString()} + $1,000 bonus.`);
   }
 
+  // >>> FIX: At most ONE payday per move; if landing is PAYDAY, prefer landing over crossings.
   function moveBy(p,steps,summary){
     const start=p.position;
+    const landingIndex=(start+steps)%N_SQUARES;
+    const landingIsPayday = EVENTS[landingIndex].toLowerCase().includes('payday');
+    let paidThisMove = false;
 
-    // Handle each crossing BEFORE landing (so crossing PAYDAY during movement pays)
-    for(let i=1;i<steps;i++){
-      const idx=(start+i)%N_SQUARES;
-      if(EVENTS[idx].toLowerCase().includes('payday')) crossPayday(p,summary);
+    // Handle crossings BEFORE landing; if landing is PAYDAY, SKIP crossing paydays this move.
+    if(!landingIsPayday){
+      for(let i=1;i<steps;i++){
+        const idx=(start+i)%N_SQUARES;
+        if(EVENTS[idx].toLowerCase().includes('payday') && !paidThisMove){
+          crossPayday(p,summary);
+          paidThisMove = true; // only once per move
+        }
+      }
     }
 
     // Land
-    p.position=(start+steps)%N_SQUARES;
+    p.position=landingIndex;
     highlightCell(p.position);
 
     // Rent Rule on landing
     chargeRent(p,summary);
 
     const text=EVENTS[p.position];
-    const landingIsPayday = text.toLowerCase().includes('payday');
+    const isLandingPayday = text.toLowerCase().includes('payday');
 
     // Speak the tile text
     say(text);
 
     // Apply landing logic
-    if(landingIsPayday){ landingPayday(p,summary); }
+    if(isLandingPayday && !paidThisMove){
+      landingPayday(p,summary);
+      paidThisMove = true;
+    }
 
     applySquare(p,text,p.position,summary);
   }
@@ -547,6 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function closeModal(){ document.getElementById('modal').style.display='none'; }
 
+  function randomSpinNumber(){ return Math.floor(Math.random()*10)+1; }
   function extraSpin(multiplier, announcePrefix, callback){
     const roll = randomSpinNumber();
     animateToNumber(roll);
