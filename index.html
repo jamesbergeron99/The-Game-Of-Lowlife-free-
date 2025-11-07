@@ -10,55 +10,38 @@
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui, Arial, sans-serif;display:flex;flex-direction:column;min-height:100vh}
 
+  /* Header with logo + fallback title */
   header{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);background:#111}
   header img{max-height:72px;display:block}
   header h1{margin:0;font-weight:900;letter-spacing:1px;display:none;color:var(--accent)}
 
   #app{display:flex;flex-direction:column;flex:1;min-height:0}
+
+  /* Top controls (sticky) */
   #topbar{flex:0 0 auto;position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
   #controls{max-width:1200px;margin:0 auto;padding:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
   .btn{background:#e53935;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
   .btn:disabled{opacity:.6;cursor:not-allowed}
   input,select{background:#1b1b22;border:1px solid var(--border);color:#fff;border-radius:8px;padding:8px}
   label{color:var(--muted);font-size:.9rem}
-  #status{color:var(--accent)}
+  #status{color:var(--accent);min-height:1.2em}
 
-  /* --- SPINNER FIX --- */
+  /* Tiny spinner (no scrolling needed) */
   #spinnerWrap{display:flex;align-items:center;gap:8px;margin-left:auto}
-  #spinner-container{position:relative;width:100px;height:100px}
-  #spinner-wheel{position:relative;width:100%;height:100%;border-radius:50%;
-    background:conic-gradient(
-      #FF0000 0% 10%, #FF7F00 10% 20%, #FFFF00 20% 30%, #00FF00 30% 40%,
-      #0000FF 40% 50%, #4B0082 50% 60%, #8B00FF 60% 70%, #FFC0CB 70% 80%,
-      #F08080 80% 90%, #FFD700 90% 100%
-    );
-    box-shadow:0 0 12px rgba(0,0,0,0.6);
+  #spinner-container{position:relative;width:80px;height:80px;flex:0 0 auto}
+  #spinner-wheel{position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(#FF0000 0% 10%, #FF7F00 10% 20%, #FFFF00 20% 30%, #00FF00 30% 40%,
+                              #0000FF 40% 50%, #4B0082 50% 60%, #8B00FF 60% 70%, #FFC0CB 70% 80%,
+                              #F08080 80% 90%, #FFD700 90% 100%);
+    box-shadow:0 0 12px rgba(0,0,0,.6);
     transform-origin:center center;
     transition:transform 4s cubic-bezier(.25,.46,.45,.94);
+    overflow:visible;
   }
-  .spinner-number{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform-origin:0 -42px; /* perfect radial alignment */
-    font-weight:900;
-    font-size:12px;
-    color:#000;
-    text-shadow:0 0 2px #fff;
-    pointer-events:none;
-  }
-  #arrow{
-    position:absolute;
-    top:-10px;
-    left:50%;
-    transform:translateX(-50%);
-    width:0;height:0;
-    border-left:6px solid transparent;
-    border-right:6px solid transparent;
-    border-bottom:14px solid #fff;
-    z-index:5;
-  }
+  .spinner-number{position:absolute;transform:translate(-50%,-50%);font-weight:900;font-size:12px;color:#000;text-shadow:0 0 2px #fff;pointer-events:none;white-space:nowrap}
+  #arrow{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #fff;z-index:5}
 
+  /* Main: board + players */
   #main{display:flex;flex-direction:column;flex:1;min-height:0}
   #boardArea{flex:1;min-height:0;overflow:auto}
   #track{max-width:1200px;margin:8px auto;display:grid;grid-template-columns:repeat(20, 1fr);gap:4px}
@@ -81,6 +64,10 @@
   .mono{font-variant-numeric:tabular-nums}
   .delta{font-size:.8rem;color:#9ccc65;margin-left:6px}
   #log{display:none}
+
+  /* Modal */
+  #modal{display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:100;}
+  #modal .sheet{background:#181921;border:1px solid #2a2a35;border-radius:12px;max-width:560px;width:92%;padding:16px;}
 </style>
 </head>
 <body>
@@ -92,30 +79,18 @@
 <div id="app">
   <section id="topbar">
     <div id="controls">
-      <div id="lobbyControls" style="display:flex; flex-wrap:wrap; gap:10px;">
-        <button id="createGameBtn" class="btn" type="button">Create Game</button>
-        <label>Game Code:
-          <input id="gameCodeInput" type="text" placeholder="Enter Code" maxlength="4" style="width:100px;">
-        </label>
-        <button id="joinGameBtn" class="btn" type="button">Join Game</button>
-      </div>
-
-      <div id="gameLobby" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
-          <span style="color:var(--accent); font-weight:700;">Invite Code: <span id="displayGameCode"></span></span>
-      </div>
       <label>Players:
-        <select id="numPlayers" disabled> <option>2</option><option>3</option><option>4</option>
-          <option>5</option><option>6</option><option>7</option><option>8</option>
-        </select>
+        <select id="numPlayers"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
       </label>
-      <button id="buildNames" class="btn" type="button" disabled>Set Names</button>
+      <button id="buildNames" class="btn">Set Names</button>
       <div id="namesRow" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      <button id="startBtn" class="btn" type="button" disabled>Start Game</button>
-      <button id="spinBtn" class="btn" type="button" disabled>SPIN</button>
+      <button id="startBtn" class="btn" disabled>Start Game</button>
+      <button id="spinBtn" class="btn" disabled>SPIN</button>
       <label>Voice: <select id="voiceSel"></select></label>
       <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
       <span id="status">Enter names, then Start Game.</span>
 
+      <!-- tiny spinner -->
       <div id="spinnerWrap" title="Spin result is read aloud">
         <div id="spinner-container">
           <div id="spinner-wheel"></div>
@@ -137,26 +112,564 @@
 
 <section id="log"></section>
 
-<!-- SOCKET.IO -->
-<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-<script>
-  const socket = io("https://lowlife-server-1.onrender.com", { path:"/socket.io", transports:["websocket","polling"] });
+<div id="modal">
+  <div class="sheet">
+    <h3 id="modalTitle" style="margin:0 0 8px 0;">TARD CARD</h3>
+    <div id="modalBody" class="body" style="white-space:pre-wrap;line-height:1.4"></div>
+    <div id="modalActions" class="actions" style="margin-top:12px;text-align:right"><button class="btn" onclick="closeModal()">OK</button></div>
+  </div>
+</div>
 
-  // --- Spinner numbers (centered) ---
-  const spinnerWheel = document.getElementById("spinner-wheel");
-  if (spinnerWheel) {
-    // Clear any old numbers
-    document.querySelectorAll(".spinner-number").forEach(e => e.remove());
-    for (let i = 0; i < 10; i++) {
-      const num = document.createElement("div");
-      num.className = "spinner-number";
-      num.textContent = i + 1;
-      num.style.transform = `rotate(${i * 36}deg)`;
-      spinnerWheel.appendChild(num);
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* ===== Spinner number placement tuning =====
+     Increase SCALE to push numbers outward toward the rim.
+     Make Y_BIAS more negative to move numbers upward (≈ -20px ~ ~¼ inch on many screens). */
+  const SPINNER_NUMBER_RADIUS_SCALE = 0.94;   // was ~ (r - 12px). Now a bigger ring for better wedge centering.
+  const SPINNER_NUMBER_Y_BIAS_PX    = -20;    // upward nudge (negative = up)
+
+  /* ===== Logo fallback ===== */
+  const logo = document.getElementById('logo');
+  logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
+
+  /* ===== Board events: 100 squares (Square #99 = fatal bankruptcy, #100 = finish) ===== */
+  const EVENTS = [
+    'Start','High school pregnancy, gain a family member','Sell weed at school, earn $500','Tard card','Payday','Breast implant bursts, pay $500 for surgery','Mom gets fired from the brothel, gain a family member','Identity theft','Waiting for dealer, miss a turn','Tard card','Payday','High on K, fall back two spaces','Pick a pocket, earn $200','Add to shit mix','Tard card','Bankruptcy, spend a five or nine to avoid financial ruin','Got fired as porn fluffer, miss next payday','Payday','Pay back payday loan, $600','Tard card','Extortion','Identity theft','Wake up and need stitches in your head, miss a turn','Drink the shit mix','Add to shit mix','Payday','Accidentally poison your spouse, lose a family member','Extortion','Dine and dash, earn $100','Lottery, spend three or nine to win','Payday','Tard card','Got a father\'s day abortion, lose a family member','Identity theft','Get laid off on your birthday, miss your next payday, do a shot','Gerbiling incident, pay $1,000 for removal','Payday','Shotgun wedding, gain a family member','Lottery, spend four or eight to win','Crazy brother won\'t leave, gain a family member','Tard card','Your TikTok goes viral, spin times 100','Get a massage with a happy ending, pay $300','Extortion','Ha ha, it\'s twins, gain a family member, times two','Payday','Feeling a bit tipsy, stumble forward one space','Bankruptcy, spin a three to avoid total ruin','Tard card','Get work as dildo tester, earn $1,000','Get a payday loan, earn $200','Fly to Thailand to get a vagina installed, pay $1,000','Family delousing, pay 500 per member','Payday','Lottery, spin a one to win','Bankruptcy, you\'re fucked','Identity theft','Tard card','Lost a kid at the mall, lose a family member','Got a part-time job as a porn fluffer, spin times 100','Payday','Drink the shit mix','Steal $1,000 from any player','Tard card','Extortion','Payday','Go back three spaces to look for phone','Lottery, spin a one or nine to win','Surprise! I\'m your kid. Gain a family member.','Identity theft','Sell used sex toys online. Spin x 50.','Tard card','Buy used sex toys online. Pay $300.','Payday','Arrested in the Dominican. Pay $5,000.','High on meth. Speed ahead two places.','Tard card','Bankruptcy. Spin 9 to avoid total ruin.',
+    /* new 21 to reach 100 total, with the last two overridden below */
+    'Payday','Tard card','Identity theft','Extortion','Lottery, spin a two or eight to win','Got caught on camera shoplifting, pay $400','Found cash in a Crown Royal bag, earn $350','Bachelor party side hustle, earn $700','Baby mama drama, lose a family member','Neighborhood brawl goes viral, spin times 100','Rent\'s due, pay $500','OnlyFans flop, pay $300 for lighting','Win a radio contest, earn $250','Stuck in detox, miss a turn','Payday','Tard card','Speed date disaster, go back three spaces','Hot streak at the slots, earn $1,000','High on shrooms, stumble forward one space',
+    /* #99 and #100 */
+    'Bankruptcy — instant, no rescue.',
+    'Finish, $5,000 to the first person who crosses.'
+  ];
+  const N_SQUARES = EVENTS.length;
+
+  /* ===== TARD deck (35+ + 10 payoff) ===== */
+  const TARD_CARDS = [
+    'Grandma Joined a Cult – She ran off with a man named Moonbeam. Lose 1 family member.',
+    'Dad Arrested in the Dominican Republic – “It was just one drink!” Lose 1 family member.',
+    'Brother ODs – The good die young, the dumb die first. Lose 1 family member.',
+    'DNA Disaster – Turns out you’re not the dad. Lose 1 family member.',
+    'Family Car Fire – Somebody lit up while pumping gas. Lose 1 family member.',
+    'Mom Gets Fired from the Brothel – She’s moving in. Gain 1 family member.',
+    'Meth Lab Explosion – Dad survived and needs a couch. Gain 1 family member.',
+    'Queer Cousin Gets Thrown Out – Glitter storm incoming. Gain 1 family member.',
+    'Surprise! You’re My Real Dad – Someone’s calling you “Daddy,” and not the fun kind. Gain 1 family member.',
+    'Bro Just Got Released – Fresh out and already asking for Wi-Fi. Gain 1 family member.',
+    'Karma’s Bitch – Reverse any money loss.',
+    'Block Their Blessing – Cancel another player’s money/bonus and take it.',
+    'Public Humiliation – Force them to do the same dare or pay.',
+    'Take the Couch – Swap one family member between you and them.',
+    'Petty AF – Skip the next turn of whoever made you lose yours.',
+    'Scabies Breakout – Pay $200 per family member to get deloused.',
+    'Sing Us a Song – $500 bonus if recorded.',
+    'Update Facebook: “I WON THE LOTTERY!”',
+    'Make the Person to Your Left Laugh – Fail? Pay $100.',
+    'Share Your Most Embarrassing Moment – Earn $200 if everyone cringes.',
+    'Eat a Red Chili Pepper – Survive a full turn without water to gain $500.',
+    'Give Your Neighbor a Pearl Necklace.',
+    'Draw Your Best Cocksucker Lips in 5 Seconds.',
+    'Give Someone a Lap Dance – Collect $100 per blush.',
+    'Bad Trip – Woke up in another province. Lose 1 turn.',
+    'Repo Man – Lose your vehicle or pay $500.',
+    'Tax Refund Gone Wrong – Lose $1,000.',
+    'OnlyFans Fame – Gain $1,500, lose your job.',
+    'Evangelical Exorcism – Lose $200.',
+    'Public Urination Ticket – Lose $300.',
+    'Drag Bingo Win – Gain $300.',
+    'Bad Investment – Lose $1,500.',
+    'Power Outage Party – Gain one social connection and $100.',
+    'STD Scare – Lose a turn.',
+    'Eviction Notice – Move back home. Gain 1 family member.',
+    // +10 payoff
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.'
+  ];
+  let tardIndex = 0;
+
+  /* ===== Characters (8) ===== */
+  const CHARACTERS = [
+    { name:'Slum Lord',         payday:6500, edu:'High School', paysOff:['Pornstar'] },
+    { name:'Gold Digger',       payday:7000, edu:'Dropout',     paysOff:['Porn Producer'], rentImmunityOnLanding:true },
+    { name:'Pimp',              payday:7000, edu:'High School', paysOff:['Dirty Cop'] },
+    { name:'Drug Dealer',       payday:6500, edu:'Dropout',     paysOff:[] },
+    { name:'Pornstar',          payday:6000, edu:'Dropout',     paysOff:['Pimp'] },
+    { name:'Porn Producer',     payday:7000, edu:'High School', paysOff:['Gold Digger'] },
+    { name:'Online Influencer', payday:6500, edu:'Dropout',     paysOff:['Dirty Cop'] },
+    { name:'Dirty Cop',         payday:6500, edu:'High School', paysOff:[] }
+  ];
+
+  /* ===== State ===== */
+  let players = [];
+  let current = 0;
+  let spinning = false;
+  let voices = [];
+  let chosenVoice = null;
+  let currentAngle = 0;
+
+  /* ===== Elements ===== */
+  const numPlayersSel = document.getElementById('numPlayers');
+  const buildNamesBtn = document.getElementById('buildNames');
+  const startBtn = document.getElementById('startBtn');
+  const spinBtn = document.getElementById('spinBtn');
+  const namesRow = document.getElementById('namesRow');
+  const statusEl = document.getElementById('status');
+  const boardEl = document.getElementById('track');
+  const playersEl = document.getElementById('players');
+  const logEl = document.getElementById('log');
+  const voiceSel = document.getElementById('voiceSel');
+  const deckCountEl = document.getElementById('deckCount');
+  const wheel = document.getElementById('spinner-wheel');
+
+  /* ===== Helpers ===== */
+  function pickColor(i){ const pal=['#f44336','#2196f3','#4caf50','#ff9800','#e91e63','#00bcd4','#9c27b0','#8bc34a']; return pal[i%pal.length]; }
+  function updateDeckCount(){ deckCountEl.textContent = (TARD_CARDS.length - tardIndex) + ' / ' + TARD_CARDS.length; }
+  function shuffleTard(){ TARD_CARDS.sort(()=>Math.random()-0.5); tardIndex = 0; updateDeckCount(); }
+  function say(text){ if(!window.speechSynthesis||!text) return; const u=new SpeechSynthesisUtterance(text); if(chosenVoice) u.voice=chosenVoice; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+  function sayDelayed(text,ms){ setTimeout(()=>say(text), ms||1100); }
+
+  /* ===== Voices ===== */
+  function populateVoices(){
+    if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
+    voices=speechSynthesis.getVoices()||[]; voiceSel.innerHTML='';
+    if(voices.length===0){ voiceSel.innerHTML='<option>(no voices)</option>'; chosenVoice=null; return; }
+    voices.forEach((v,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=`${v.name} — ${v.lang}`; voiceSel.appendChild(o); });
+    const idx=voices.findIndex(v=>/UK|British/i.test(v.name+v.lang)&&/en/i.test(v.lang));
+    voiceSel.selectedIndex=idx>=0?idx:0; chosenVoice=voices[voiceSel.selectedIndex]||null;
+  }
+  if('speechSynthesis' in window){ populateVoices(); window.speechSynthesis.onvoiceschanged = populateVoices; }
+  voiceSel.addEventListener('change', e=>{ chosenVoice=voices[e.target.value]; });
+
+  /* ===== Spinner numbers (bigger ring + upward bias) ===== */
+  function placeSpinnerNumbers(){
+    // Clear existing
+    wheel.querySelectorAll('.spinner-number').forEach(n=>n.remove());
+    const rect = wheel.getBoundingClientRect();
+    const cx = rect.width/2, cy = rect.height/2;
+
+    // Bigger placement radius + manual upward bias
+    const r = (Math.min(rect.width, rect.height)/2) * SPINNER_NUMBER_RADIUS_SCALE;
+    for(let i=1;i<=10;i++){
+      const angleDeg=(i-0.5)*36;                 // center of wedge
+      const angleRad=(angleDeg-90)*Math.PI/180;  // -90 so 0° is up
+      const x = cx + r * Math.cos(angleRad);
+      const y = cy + r * Math.sin(angleRad) + SPINNER_NUMBER_Y_BIAS_PX;
+
+      const d = document.createElement('div');
+      d.className='spinner-number';
+      d.textContent=i;
+      d.style.left = x+'px';
+      d.style.top  = y+'px';
+      wheel.appendChild(d);
     }
   }
-</script>
+  // Ensure layout is ready before measuring
+  requestAnimationFrame(placeSpinnerNumbers);
+  window.addEventListener('resize', ()=>requestAnimationFrame(placeSpinnerNumbers));
 
-<!-- Your existing game JavaScript continues below this comment -->
+  function animateToNumber(target){
+    const centerAngle=(target-0.5)*36;               // where the center of wedge is (0..360)
+    // Arrow points up (270°). We want the target center under the arrow.
+    const desiredMod=(270-centerAngle+360)%360;
+    const currentMod=((currentAngle%360)+360)%360;
+    const spins=6;                                   // full spins for drama
+    const delta=((desiredMod-currentMod+360)%360)+spins*360;
+    currentAngle+=delta;
+    wheel.style.transform=`rotate(${currentAngle}deg)`;
+  }
+
+  /* ===== Names / Start ===== */
+  buildNamesBtn.addEventListener('click', ()=>{
+    namesRow.innerHTML='';
+    const n = parseInt(numPlayersSel.value)||2;
+    for(let i=0;i<n;i++){
+      const inp=document.createElement('input');
+      inp.placeholder=`Player ${i+1} name`; inp.id=`pname_${i}`; inp.maxLength=20;
+      namesRow.appendChild(inp);
+    }
+    startBtn.disabled=false;
+    statusEl.textContent='Enter names, then Start Game.';
+  });
+
+  startBtn.addEventListener('click', ()=>{
+    const n=parseInt(numPlayersSel.value)||2;
+    const pool=[...CHARACTERS];
+    players=[];
+    for(let i=0;i<n;i++){
+      const nm=(document.getElementById(`pname_${i}`)?.value||`Player ${i+1}`).trim();
+      const idx=Math.floor(Math.random()*pool.length);
+      const char=pool.splice(idx,1)[0];
+      players.push({id:i+1,name:nm,character:char,position:0,money:0,family:0,missNextTurn:false,missNextPayday:false,lastMoneyDelta:0,color:pickColor(i)});
+    }
+    // Dropouts spin first
+    players.sort((a,b)=> (a.character.edu==='Dropout')===(b.character.edu==='Dropout')?0:(a.character.edu==='Dropout'?-1:1));
+    current=0;
+    renderBoard(); renderPlayers(); highlightCell(0);
+    spinBtn.disabled=false;
+    statusEl.textContent=`Game on. ${players[current].name} (${players[current].character.name}) to spin.`;
+  });
+
+  /* ===== Board render ===== */
+  function classify(text){ const t=text.toLowerCase();
+    if(t.startsWith('start'))return'start'; if(t.startsWith('finish'))return'finish';
+    if(t.includes('payday'))return'payday'; if(t.includes('tard card'))return'tard';
+    if(t.includes('bankruptcy'))return'bankruptcy'; if(t.includes('lottery'))return'lottery';
+    if(t.includes('identity theft'))return'idtheft'; if(t.includes('extortion'))return'extortion';
+    return'normal';
+  }
+  function shortLabel(text){ const t=text.toLowerCase();
+    if(t.includes('payday'))return'PAYDAY'; if(t.includes('tard card'))return'TARD';
+    if(t.includes('lottery'))return'LOTTO'; if(t.includes('bankruptcy'))return'BANKRUPT';
+    if(t.includes('identity theft'))return'ID THEFT'; if(t.includes('extortion'))return'EXTORT';
+    return text.length>22? text.slice(0,21)+'…':text;
+  }
+  function renderBoard(){
+    boardEl.innerHTML='';
+    for(let i=0;i<N_SQUARES;i++){
+      const text=EVENTS[i]; const kind=classify(text);
+      const c=document.createElement('div');
+      c.className='cell '+(kind==='normal'?'':kind);
+      c.dataset.index=i; c.title=text;
+      c.innerHTML=`<div><b>${i+1}</b><small>${shortLabel(text)}</small></div>`;
+      boardEl.appendChild(c);
+    }
+  }
+  function highlightCell(idx){
+    document.querySelectorAll('.cell').forEach(e=>e.classList.remove('active'));
+    const el=document.querySelector(`.cell[data-index="${idx}"]`);
+    if(el) el.classList.add('active');
+  }
+
+  /* ===== Players dock ===== */
+  function renderPlayers(){
+    playersEl.innerHTML='';
+    players.forEach((p,i)=>{
+      const d=document.createElement('div'); d.className='card';
+      d.innerHTML=`<div class="title">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name} — ${p.character.name}
+      </div>
+      <div>Edu: ${p.character.edu}</div>
+      <div>Payday: <span class="mono">$${p.character.payday.toLocaleString()}</span></div>
+      <div>Money: <span class="mono">$${p.money.toLocaleString()}</span> | Family: <span class="mono">${p.family}</span> <span class="delta">${p.lastMoneyDelta?`(${p.lastMoneyDelta>0?'+':''}${p.lastMoneyDelta})`:''}</span></div>
+      <div>Pos: <span class="mono">#${p.position+1}</span> — ${EVENTS[p.position]}</div>`;
+      if(i===current) d.style.outline='2px solid #ffd54f';
+      playersEl.appendChild(d);
+    });
+  }
+
+  /* ===== Modal ===== */
+  function showModal(title,body,buttons){
+    document.getElementById('modalTitle').textContent=title;
+    const bodyEl=document.getElementById('modalBody');
+    bodyEl.innerHTML='';
+    if(typeof body==='string') bodyEl.textContent=body; else bodyEl.appendChild(body);
+    const actions=document.getElementById('modalActions');
+    actions.innerHTML='';
+    (buttons||[{label:'OK',action:closeModal}]).forEach(b=>{
+      const btn=document.createElement('button'); btn.className='btn'; btn.textContent=b.label;
+      btn.onclick=()=>{ b.action&&b.action(); };
+      actions.appendChild(btn);
+    });
+    document.getElementById('modal').style.display='flex';
+  }
+  function closeModal(){ document.getElementById('modal').style.display='none'; }
+
+  /* ===== Turn flow ===== */
+  spinBtn.addEventListener('click', ()=>{
+    if(spinning) return;
+    const roll = Math.floor(Math.random()*10)+1;
+    spinning=true; spinBtn.disabled=true;
+    animateToNumber(roll);
+    sayDelayed(`You spun a ${roll}.`, 1200);
+    setTimeout(()=>{ resolveSpin(roll); spinning=false; spinBtn.disabled=false; }, 4000);
+  });
+
+  function resolveSpin(roll){
+    const p=players[current]; if(!p) return;
+    const summary=[];
+
+    if(p.missNextTurn){
+      p.missNextTurn=false;
+      summary.push(`You spun ${roll}, but you miss your turn.`);
+      endTurn(summary);
+      return;
+    }
+
+    moveBy(p, roll, summary);
+    endTurn(summary);
+  }
+
+  function endTurn(summary){
+    if(summary.length){ sayDelayed(`Summary: ${summary.join(' ')}`, 400); }
+    current=(current+1)%players.length;
+    statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`;
+  }
+
+  /* ===== Movement + PAYDAY logic ===== */
+  function processCrossingPayday(p, summary){
+    if(p.missNextPayday){ p.missNextPayday=false; summary.push('Crossed PAYDAY: shot, no pay.'); return; }
+    moneyDelta(p, p.character.payday); summary.push(`Crossed PAYDAY: +$${p.character.payday.toLocaleString()} and do a shot.`);
+  }
+  function processLandingPayday(p, summary){
+    // Landing gives normal pay + $1000 bonus (NOT an extra cross payment)
+    moneyDelta(p, p.character.payday);
+    moneyDelta(p, 1000);
+    summary.push(`Landed on PAYDAY: +$${p.character.payday.toLocaleString()} + $1,000 bonus.`);
+  }
+
+  function moveBy(p, steps, summary){
+    const start=p.position;
+    const landing=(start+steps)%N_SQUARES;
+    const landingIsPayday = EVENTS[landing].toLowerCase().includes('payday');
+
+    // Crossing payday only for intermediate squares (i = 1..steps-1)
+    if(!landingIsPayday){
+      for(let i=1;i<steps;i++){
+        const idx=(start+i)%N_SQUARES;
+        if(EVENTS[idx].toLowerCase().includes('payday')) processCrossingPayday(p, summary);
+      }
+    }
+
+    p.position=landing;
+    highlightCell(p.position);
+
+    // Rent rule on arrival (before square effects)
+    chargeRent(p, summary);
+
+    const text=EVENTS[p.position];
+    say(text);
+    if(landingIsPayday) processLandingPayday(p, summary);
+
+    applySquare(p, text, p.position, summary);
+    renderPlayers();
+  }
+
+  /* ===== Money / Family helpers ===== */
+  function moneyDelta(p,amt){ p.money+=amt; p.lastMoneyDelta=amt; renderPlayers(); }
+  function familyDelta(p,df){ p.family=Math.max(0,p.family+df); renderPlayers(); }
+
+  /* ===== Rent Rule ===== */
+  function chargeRent(p, summary){
+    const others = players.filter(o => o!==p && o.position === p.position);
+    if(others.length === 0) return;
+    if(p.character && p.character.name === 'Gold Digger'){
+      summary.push('Rent immunity (Gold Digger).');
+      return;
+    }
+    const rent = 500 * Math.max(1, (p.family||0) + 1);
+    others.forEach(o=>{
+      p.money -= rent; o.money += rent; p.lastMoneyDelta=-rent; o.lastMoneyDelta=rent;
+      summary.push(`Paid $${rent.toLocaleString()} rent to ${o.name}.`);
+    });
+    renderPlayers();
+  }
+
+  /* ===== Square logic ===== */
+  function drawTardCard(p, summary){
+    if(tardIndex>=TARD_CARDS.length){ shuffleTard(); }
+    const card=TARD_CARDS[tardIndex++]; updateDeckCount();
+    showModal('TARD CARD', card, [{label:'OK',action:()=>closeModal()}]);
+    sayDelayed(card, 1100);
+
+    const t=card.toLowerCase();
+    if(t.includes('payoff card')){
+      const payees=p.character.paysOff||[];
+      const targets = players.filter(o => o!==p && payees.includes(o.character.name));
+      if(targets.length){
+        extraSpin(p, 50, 'Payoff amount times fifty.', (amount)=>{
+          targets.forEach(o=>{ p.money -= amount; p.lastMoneyDelta=-amount; o.money += amount; o.lastMoneyDelta=amount; });
+          summary.push(`Payoff: $${amount.toLocaleString()} to ${targets.map(t=>t.name).join(', ')}.`);
+          renderPlayers();
+        });
+      }
+      return;
+    }
+
+    if(t.includes('lose 1 family')){ familyDelta(p,-1); summary.push('Family -1.'); }
+    if(t.includes('gain 1 family')){ familyDelta(p,+1); summary.push('Family +1.'); }
+    if(t.includes('skip the next turn')||t.includes('lose a turn')){ p.missNextTurn=true; summary.push('Miss next turn.'); }
+    if(t.includes('pay $200 per family')){ const amt=200*p.family; moneyDelta(p,-amt); summary.push(`Paid $${amt} for delousing.`); }
+    if(t.includes('pay $100')){ moneyDelta(p,-100); summary.push('Paid $100.'); }
+    if(t.includes('earn $200')){ moneyDelta(p,200); summary.push('Earned $200.'); }
+    if(t.includes('gain $500')){ moneyDelta(p,500); summary.push('Earned $500.'); }
+    if(t.includes('gain $300')){ moneyDelta(p,300); summary.push('Earned $300.'); }
+    if(t.includes('lose $1,000')){ moneyDelta(p,-1000); summary.push('Lost $1,000.'); }
+    if(t.includes('gain $1,500')){ moneyDelta(p,1500); summary.push('Earned $1,500.'); }
+    if(t.includes('lose $200')){ moneyDelta(p,-200); summary.push('Lost $200.'); }
+    if(t.includes('lose $300')){ moneyDelta(p,-300); summary.push('Lost $300.'); }
+    if(t.includes('lose $1,500')){ moneyDelta(p,-1500); summary.push('Lost $1,500.'); }
+    if(t.includes('eviction notice')){ familyDelta(p,+1); summary.push('Moved back home: Family +1.'); }
+  }
+
+  function handleIdentityTheft(p, summary){
+    if(players.length<=1){ return; }
+    const wrap=document.createElement('div'); const sel=document.createElement('select');
+    players.forEach(o=>{ if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name} — ${o.character.name}`; sel.appendChild(opt);} });
+    wrap.innerHTML='<div>Choose a player to steal their identity (character card) and position:</div>'; wrap.appendChild(sel);
+    showModal('IDENTITY THEFT', wrap, [
+      {label:'Cancel',action:closeModal},
+      {label:'Steal',action:()=>{ const victim=players.find(x=>x.id===parseInt(sel.value));
+        if(!victim){ closeModal(); return; }
+        const tmpChar=p.character; p.character=victim.character; victim.character=tmpChar;
+        const tmpPos=p.position; p.position=victim.position; victim.position=tmpPos;
+        summary.push(`Identity Theft: stole ${victim.name}'s character and position.`);
+        renderPlayers(); closeModal();
+      }}
+    ]);
+  }
+
+  function handleExtortion(p, summary){
+    if(players.length<=1){ return; }
+    const wrap=document.createElement('div'); const sel=document.createElement('select');
+    players.forEach(o=>{ if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name} — ${o.character.name}`; sel.appendChild(opt);} });
+    wrap.innerHTML='<div>Choose a player to extort (they pay you spin × 100):</div>'; wrap.appendChild(sel);
+    showModal('EXTORTION', wrap, [
+      {label:'Cancel',action:closeModal},
+      {label:'Extort',action:()=>{ const victim=players.find(x=>x.id===parseInt(sel.value));
+        if(!victim){ closeModal(); return; }
+        extraSpin(p, 100, 'Extortion — spin times one hundred.', (amount)=>{
+          victim.money -= amount; victim.lastMoneyDelta=-amount; p.money += amount; p.lastMoneyDelta=amount;
+          summary.push(`Extorted $${amount.toLocaleString()} from ${victim.name}.`);
+          renderPlayers(); closeModal();
+        });
+      }}
+    ]);
+  }
+
+  function handleExtortionLikeSteal(p, amount, summary){
+    if(players.length<=1){ return; }
+    const wrap=document.createElement('div'); const sel=document.createElement('select');
+    players.forEach(o=>{ if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name}`; sel.appendChild(opt);} });
+    wrap.innerHTML=`<div>Choose a player to steal $${amount.toLocaleString()} from:</div>`; wrap.appendChild(sel);
+    showModal('STEAL', wrap, [
+      {label:'Cancel',action:closeModal},
+      {label:'Steal',action:()=>{ const victim=players.find(x=>x.id===parseInt(sel.value));
+        if(!victim){ closeModal(); return; }
+        victim.money -= amount; victim.lastMoneyDelta=-amount; p.money += amount; p.lastMoneyDelta=amount;
+        summary.push(`Stole $${amount.toLocaleString()} from ${victim.name}.`);
+        renderPlayers(); closeModal();
+      }}
+    ]);
+  }
+
+  function bankruptcyRescue(p, textLower, summary){
+    if(textLower.includes('instant, no rescue')){ doBankruptImmediate(p, summary); return; }
+    if(textLower.includes("you're fucked")){ doBankruptImmediate(p, summary); return; }
+    let avoids=new Set();
+    if(textLower.includes('spin a three')) avoids.add(3);
+    if(textLower.includes('spin 9')) avoids.add(9);
+    if(textLower.includes('five or nine') || textLower.includes('5 or 9')){ avoids.add(5); avoids.add(9); }
+    if(avoids.size===0){ avoids.add(5); avoids.add(9); }
+    const roll=Math.floor(Math.random()*10)+1;
+    animateToNumber(roll); sayDelayed(`Bankruptcy rescue spin: ${roll}.`, 900);
+    setTimeout(()=>{ if(avoids.has(roll)){ summary.push(`Avoided bankruptcy with ${roll}.`); } else { doBankruptImmediate(p, summary); } }, 3000);
+  }
+  function doBankruptImmediate(p, summary){
+    const lost=p.money; p.money=0; p.lastMoneyDelta=-lost;
+    summary.push('Bankrupt: all money lost (no rescue).');
+    sayDelayed(`${p.name}, you just went bankrupt. You lose all your money.`, 500);
+    renderPlayers();
+  }
+
+  function extraSpin(p, multiplier, announcePrefix, callback){
+    const roll = Math.floor(Math.random()*10)+1;
+    animateToNumber(roll);
+    sayDelayed(`${announcePrefix} You spun a ${roll}.`, 900);
+    setTimeout(()=>{ const amount=roll*multiplier; callback(amount, roll); }, 3000);
+  }
+
+  function applySquare(p, text, idx, summary){
+    const t=text.toLowerCase();
+
+    // Narration cues for clarity
+    if(t.includes('waiting for dealer')) summary.push('Waiting for dealer: you miss your next turn.');
+    if(t.includes('add to shit mix')) summary.push('Add to the shit mix.');
+    if(t.includes('drink the shit mix')) summary.push('Drink the shit mix.');
+    if(t.includes('do a shot')) summary.push('Do a shot.');
+
+    if(t.includes('identity theft')){ handleIdentityTheft(p, summary); return; }
+    if(t.includes('tard card')){ drawTardCard(p, summary); return; }
+    if(t.includes('extortion')){ handleExtortion(p, summary); }
+
+    // Extra spin “× N”
+    const spinTimesMatch = /spin(?:\s+times)?\s*[x×]?\s*(\d+)/i.exec(text);
+    if(spinTimesMatch){
+      const mult = parseInt(spinTimesMatch[1],10);
+      const earnLike = /sell|job|viral|work|tester|influencer|collect/i.test(text) && !/pay/i.test(text);
+      const payLike  = /pay/i.test(text) && !earnLike;
+      if(payLike){ extraSpin(p, mult, `Extra spin times ${mult}.`, (amount)=>{ moneyDelta(p,-amount); summary.push(`Paid $${amount.toLocaleString()} (×${mult}).`); }); }
+      else{        extraSpin(p, mult, `Extra spin times ${mult}.`, (amount)=>{ moneyDelta(p, amount); summary.push(`Earned $${amount.toLocaleString()} (×${mult}).`); }); }
+      return;
+    }
+
+    // Money deltas
+    if(t.includes('earn $1000')||t.includes('earn $1,000')){ moneyDelta(p,1000); summary.push('Earned $1,000.'); }
+    if(t.includes('earn $100')){ moneyDelta(p,100); summary.push('Earned $100.'); }
+    if(t.includes('earn $700')){ moneyDelta(p,700); summary.push('Earned $700.'); }
+    if(t.includes('earn $500')){ moneyDelta(p,500); summary.push('Earned $500.'); }
+    if(t.includes('earn $400')){ moneyDelta(p,400); summary.push('Earned $400.'); }
+    if(t.includes('earn $350')){ moneyDelta(p,350); summary.push('Earned $350.'); }
+    if(t.includes('earn $300')){ moneyDelta(p,300); summary.push('Earned $300.'); }
+    if(t.includes('earn $250')){ moneyDelta(p,250); summary.push('Earned $250.'); }
+
+    if(t.includes('pay $700')){ moneyDelta(p,-700); summary.push('Paid $700.'); }
+    if(t.includes('pay $600')){ moneyDelta(p,-600); summary.push('Paid $600.'); }
+    if(t.includes('pay $500 for surgery')){ moneyDelta(p,-500); summary.push('Paid $500 for surgery.'); }
+    if(t.includes('pay $500') && !t.includes('for surgery')){ moneyDelta(p,-500); summary.push('Paid $500.'); }
+    if(t.includes('pay 500 per member')){ const amt=500*p.family; moneyDelta(p,-amt); summary.push(`Paid $${amt.toLocaleString()} for family delousing.`); }
+    if(t.includes('pay $400')){ moneyDelta(p,-400); summary.push('Paid $400.'); }
+    if(t.includes('pay $350')){ moneyDelta(p,-350); summary.push('Paid $350.'); }
+    if(t.includes('pay $300 for lighting')){ moneyDelta(p,-300); summary.push('Paid $300 for lighting.'); }
+    if(t.includes('pay $300')){ moneyDelta(p,-300); summary.push('Paid $300.'); }
+    if(t.includes('pay $200')){ moneyDelta(p,-200); summary.push('Paid $200.'); }
+    if(t.includes('pay $150')){ moneyDelta(p,-150); summary.push('Paid $150.'); }
+    if(t.includes('pay $1,000')){ moneyDelta(p,-1000); summary.push('Paid $1,000.'); }
+    if(t.includes('pay $5,000')){ moneyDelta(p,-5000); summary.push('Paid $5,000.'); }
+    if(t.includes('steal $1,000')){ handleExtortionLikeSteal(p,1000,summary); }
+
+    // Family
+    if(t.includes('gain a family member, times two')){ familyDelta(p,+2); summary.push('Family +2.'); }
+    else if(t.includes('gain a family member')){ familyDelta(p,+1); summary.push('Family +1.'); }
+    if(t.includes('lose a family member')){ familyDelta(p,-1); summary.push('Family -1.'); }
+
+    // Turn effects
+    if(t.includes('miss a turn') || t.includes('detox')){ p.missNextTurn=true; summary.push('Miss next turn.'); }
+    if(t.includes('miss next payday')){ p.missNextPayday=true; summary.push('Miss next payday.'); }
+
+    // Position nudges with chaining
+    if(t.includes('go back three')){
+      p.position=(p.position-3+N_SQUARES)%N_SQUARES; highlightCell(p.position);
+      const nxt=EVENTS[p.position]; summary.push('Moved back 3.'); applySquare(p,nxt,p.position,summary); return;
+    }
+    if(t.includes('fall back two')){
+      p.position=(p.position-2+N_SQUARES)%N_SQUARES; highlightCell(p.position);
+      const nxt=EVENTS[p.position]; summary.push('Moved back 2.'); applySquare(p,nxt,p.position,summary); return;
+    }
+    if(t.includes('stumble forward one') || t.includes('speed ahead two places')){
+      const jump = t.includes('speed ahead two') ? 2 : 1;
+      p.position=(p.position+jump)%N_SQUARES; highlightCell(p.position);
+      const nxt=EVENTS[p.position]; summary.push(`Moved forward ${jump}.`); applySquare(p,nxt,p.position,summary); return;
+    }
+
+    // Lottery / Bankruptcy
+    if(t.includes('lottery')){ summary.push('Lottery square (manual for now).'); }
+    if(t.includes('bankruptcy')){ bankruptcyRescue(p, t, summary); }
+  }
+
+  /* ===== Init ===== */
+  function updateAll(){ renderBoard(); renderPlayers(); shuffleTard(); }
+  updateAll(); updateDeckCount(); statusEl.textContent='Enter names, then Start Game.';
+
+  // quick self-check
+  console.assert(EVENTS.length===100,'EVENTS should be 100, got',EVENTS.length);
+});
+</script>
 </body>
 </html>
