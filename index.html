@@ -1,625 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>The Game of Lowlife</title>
-<style>
-  :root{--bg:#0b0b0e;--ink:#f5f5f7;--muted:#b7b7c2;--accent:#ffd54f;--border:#2a2a35;--card:#15161d}
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui, Arial, sans-serif;display:flex;flex-direction:column;min-height:100vh}
-
-  /* Header with logo + fallback title */
-  header{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);background:#111}
-  header img{max-height:72px;display:block}
-  header h1{margin:0;font-weight:900;letter-spacing:1px;display:none;color:var(--accent)}
-
-  /* App layout */
-  #app{display:flex;flex-direction:column;flex:1;min-height:0}
-
-  /* Sticky controls (top) */
-  #topbar{flex:0 0 auto;position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
-  #controls{max-width:1200px;margin:0 auto;padding:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-  .btn{background:#e53935;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
-  .btn:disabled{opacity:.6;cursor:not-allowed}
-  input,select{background:#1b1b22;border:1px solid var(--border);color:#fff;border-radius:8px;padding:8px}
-  label{color:var(--muted);font-size:.9rem}
-  #status{color:var(--accent)}
-
-  /* Tiny spinner embedded in topbar */
-  #spinnerWrap{display:flex;align-items:center;gap:8px;margin-left:auto}
-  #spinner-container{position:relative;width:80px;height:80px}
-  #spinner-wheel{position:relative;width:100%;height:100%;border-radius:50%;
-    background:conic-gradient(#FF0000 0% 10%, #FF7F00 10% 20%, #FFFF00 20% 30%, #00FF00 30% 40%,
-                              #0000FF 40% 50%, #4B0082 50% 60%, #8B00FF 60% 70%, #FFC0CB 70% 80%,
-                              #F08080 80% 90%, #FFD700 90% 100%);
-    box-shadow:0 0 12px rgba(0,0,0,.6);transform-origin:center center;transition:transform 4s cubic-bezier(.25,.46,.45,.94)
-  }
-  .spinner-number{position:absolute;left:50%;top:50%;transform-origin:0 0;font-weight:900;font-size:10px;color:#000;text-shadow:0 0 2px #fff}
-  #arrow{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #fff;z-index:5}
-
-  /* Main area: board takes remaining height; players dock at bottom */
-  #main{display:flex;flex-direction:column;flex:1;min-height:0}
-  #boardArea{flex:1;min-height:0;overflow:auto}
-  #track{max-width:1200px;margin:8px auto;display:grid;grid-template-columns:repeat(20, 1fr);gap:4px}
-  .cell{min-height:44px;border:1px solid var(--border);background:#202028;color:#ddd;font-size:.7rem;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:8px;padding:3px}
-  .cell small{display:block;color:#cfcfcf;font-size:.6rem;margin-top:2px}
-  .cell.start{background:#1b5e20}
-  .cell.finish{background:#0d47a1}
-  .cell.payday{background:#2e7d32;color:#fff;font-weight:800}
-  .cell.tard{background:#5a189a}
-  .cell.bankruptcy{background:#b71c1c}
-  .cell.lottery{background:#795548}
-  .cell.idtheft{background:#263238}
-  .cell.extortion{background:#4e342e}
-  .cell.active{outline:3px dashed #ffd54f}
-
-  /* Players dock at the bottom, always visible */
-  #playersDock{flex:0 0 170px;border-top:1px solid var(--border);background:#0e0e12}
-  #players{height:100%;max-width:1200px;margin:0 auto;padding:8px;display:flex;gap:12px;overflow:auto}
-  .card{min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px}
-  .title{font-weight:900;margin-bottom:6px}
-  .mono{font-variant-numeric:tabular-nums}
-  .delta{font-size:.8rem;color:#9ccc65;margin-left:6px}
-
-  /* Log (collapsed by default to save space) */
-  #log{display:none}
-</style>
+  <meta charset="UTF-8" />
+  <title>The Game of Lowlife — Online</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; padding: 24px; background: #111; color: #eee; }
+    h1 { margin: 0 0 16px; font-size: 22px; }
+    .wrap { display: grid; gap: 16px; grid-template-columns: 1fr; max-width: 900px; margin: 0 auto; }
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .row > * { flex: 0 0 auto; }
+    input, select, button, textarea {
+      background: #0f0f0f; color: #eee; border: 1px solid #2a2a2a; border-radius: 8px; padding: 10px;
+      font-size: 14px;
+    }
+    input:disabled, select:disabled, button:disabled, textarea:disabled { opacity: .5; }
+    button { cursor: pointer; }
+    button.primary { background: #2563eb; border-color: #2563eb; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .tag { background: #222; border: 1px solid #333; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .status { white-space: pre-wrap; font-size: 12px; color: #aaa; }
+    .grid { display: grid; gap: 8px; }
+    .grid2 { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #222; font-size: 14px; }
+    .ok { color: #22c55e; }
+    .warn { color: #f59e0b; }
+    .err { color: #ef4444; }
+  </style>
 </head>
 <body>
-<header>
-  <img id="logo" src="lowlife logo.jpg" alt="The Game of Lowlife">
-  <h1>The Game of Lowlife</h1>
-</header>
+  <div class="wrap">
+    <h1>The Game of Lowlife — Online Multiplayer</h1>
 
-<div id="app">
-  <section id="topbar">
-    <div id="controls">
-      
-      <div id="lobbyControls" style="display:flex; flex-wrap:wrap; gap:10px;">
-        <button id="createGameBtn" class="btn" type="button">Create Game</button>
-        <label>Game Code:
-          <input id="gameCodeInput" type="text" placeholder="Enter Code" maxlength="4" style="width:100px;">
-        </label>
-        <button id="joinGameBtn" class="btn" type="button">Join Game</button>
+    <!-- CONNECTION -->
+    <div class="card">
+      <div class="row">
+        <div>Server:</div>
+        <div id="serverUrl" class="mono tag"></div>
+        <div>Socket:</div>
+        <div id="connState" class="tag">connecting…</div>
       </div>
+      <div id="status" class="status" style="margin-top:8px;"></div>
+    </div>
 
-      <div id="gameLobby" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
-          <span style="color:var(--accent); font-weight:700;">Invite Code: <span id="displayGameCode"></span></span>
-      </div>
-      <label>Players:
-        <select id="numPlayers" disabled> <option>2</option><option>3</option><option>4</option>
-          <option>5</option><option>6</option><option>7</option><option>8</option>
-        </select>
-      </label>
-      <button id="buildNames" class="btn" type="button" disabled>Set Names</button>
-      <div id="namesRow" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      <button id="startBtn" class="btn" type="button" disabled>Start Game</button>
-      <button id="spinBtn" class="btn" type="button" disabled>SPIN</button>
-      <label>Voice: <select id="voiceSel"></select></label>
-      <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
-      <span id="status">Enter names, then Start Game.</span>
+    <!-- HOST PANEL -->
+    <div class="card" id="hostCard">
+      <h2 style="margin-top:0;">Host a Game</h2>
+      <div class="grid">
+        <div class="row">
+          <button id="createGameBtn" class="primary">Create Game</button>
+          <div>Code: <span id="gameCode" class="mono tag">—</span></div>
+          <div>Role: <span id="roleTag" class="tag">—</span></div>
+        </div>
 
-      <div id="spinnerWrap" title="Spin result is read aloud">
-        <div id="spinner-container">
-          <div id="spinner-wheel"></div>
-          <div id="arrow"></div>
+        <div class="row">
+          <label for="numPlayers">Players</label>
+          <select id="numPlayers">
+            <option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option>
+          </select>
+          <button id="saveSettingsBtn">Apply</button>
+          <span id="playersSaved" class="ok" style="display:none;">Saved</span>
+        </div>
+
+        <div>
+          <div style="margin-bottom:6px;">Player Names (auto-generates if left blank):</div>
+          <div id="nameInputs" class="grid2"></div>
+        </div>
+
+        <div class="row">
+          <button id="startGameBtn" class="primary">Start Game</button>
+        </div>
+
+        <div>
+          <div>Lobby</div>
+          <ul id="lobbyList" style="padding-left:18px; margin:8px 0 0;"></ul>
         </div>
       </div>
     </div>
-  </section>
 
-  <section id="main">
-    <section id="boardArea">
-      <div id="track"></div>
-    </section>
+    <!-- JOIN PANEL -->
+    <div class="card" id="joinCard">
+      <h2 style="margin-top:0;">Join a Game</h2>
+      <div class="row">
+        <input id="joinCode" placeholder="Enter 4-letter code" class="mono" maxlength="4" />
+        <input id="joinName" placeholder="Your name" />
+        <button id="joinBtn">Join</button>
+      </div>
+    </div>
 
-    <section id="playersDock">
-      <div id="players"></div>
-    </section>
-  </section>
-</div>
+    <!-- GAME PANEL -->
+    <div class="card" id="gameCard" style="display:none;">
+      <h2 style="margin-top:0;">Game</h2>
+      <div class="row">
+        <div>Current Player:</div>
+        <div id="currentPlayer" class="tag mono">—</div>
+        <button id="spinBtn" class="primary" disabled>SPIN</button>
+      </div>
 
-<section id="log"></section>
-
-<div id="modal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:100;">
-  <div class="sheet" style="background:#181921;border:1px solid #2a2a35;border-radius:12px;max-width:560px;width:92%;padding:16px;">
-    <h3 id="modalTitle" style="margin:0 0 8px 0;">TARD CARD</h3>
-    <div id="modalBody" class="body" style="white-space:pre-wrap;line-height:1.4"></div>
-    <div id="modalActions" class="actions" style="margin-top:12px;text-align:right"><button class="btn" onclick="closeModal()">OK</button></div>
+      <div style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>Character</th><th>Money</th><th>Pos</th><th>Last Δ</th>
+            </tr>
+          </thead>
+          <tbody id="playersTable"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
-</div>
 
-<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  // Logo fallback if image missing
-  const logo = document.getElementById('logo');
-  logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous"></script>
+  <script>
+    // ====== CONFIG ======
+    const SERVER_URL = "https://lowlife-server-1.onrender.com"; // Your Render Web Service
+    const MAX_PLAYERS = 8;
 
-  /* ===== 100 BOARD SQUARES ===== */
-  const EVENTS = [
-    'Start',
-    'High school pregnancy, gain a family member',
-    'Sell weed at school, earn $500',
-    'Tard card',
-    'Payday',
-    'Breast implant bursts, pay $500 for surgery',
-    'Mom gets fired from the brothel, gain a family member',
-    'Identity theft',
-    'Waiting for dealer, miss a turn',
-    'Tard card',
-    'Payday',
-    'High on K, fall back two spaces',
-    'Pick a pocket, earn $200',
-    'Add to shit mix',
-    'Tard card',
-    'Bankruptcy, spend a five or nine to avoid financial ruin',
-    'Got fired as porn fluffer, miss next payday',
-    'Payday',
-    'Pay back payday loan, $600',
-    'Tard card',
-    'Extortion',
-    'Identity theft',
-    'Wake up and need stitches in your head, miss a turn',
-    'Drink the shit mix',
-    'Add to shit mix',
-    'Payday',
-    'Accidentally poison your spouse, lose a family member',
-    'Extortion',
-    'Dine and dash, earn $100',
-    'Lottery, spend three or nine to win',
-    'Payday',
-    'Tard card',
-    'Got a father\'s day abortion, lose a family member',
-    'Identity theft',
-    'Get laid off on your birthday, miss your next payday, do a shot',
-    'Gerbiling incident, pay $1,000 for removal',
-    'Payday',
-    'Shotgun wedding, gain a family member',
-    'Lottery, spend four or eight to win',
-    'Crazy brother won\'t leave, gain a family member',
-    'Tard card',
-    'Your TikTok goes viral, spin times 100',
-    'Get a massage with a happy ending, pay $300',
-    'Extortion',
-    'Ha ha, it\'s twins, gain a family member, times two',
-    'Payday',
-    'Feeling a bit tipsy, stumble forward one space',
-    'Bankruptcy, spin a three to avoid total ruin',
-    'Tard card',
-    'Get work as dildo tester, earn $1,000',
-    'Get a payday loan, earn $200',
-    'Fly to Thailand to get a vagina installed, pay $1,000',
-    'Family delousing, pay 500 per member',
-    'Payday',
-    'Lottery, spin a one to win',
-    'Bankruptcy, you\'re fucked',
-    'Identity theft',
-    'Tard card',
-    'Lost a kid at the mall, lose a family member',
-    'Got a part-time job as a porn fluffer, spin times 100',
-    'Payday',
-    'Drink the shit mix',
-    'Steal $1,000 from any player',
-    'Tard card',
-    'Extortion',
-    'Payday',
-    'Go back three spaces to look for phone',
-    'Lottery, spin a one or nine to win',
-    'Surprise! I\'m your kid. Gain a family member.',
-    'Identity theft',
-    'Sell used sex toys online. Spin x 50.',
-    'Tard card',
-    'Buy used sex toys online. Pay $300.',
-    'Payday',
-    'Arrested in the Dominican. Pay $5,000.',
-    'High on meth. Speed ahead two places.',
-    'Tard card',
-    'Bankruptcy. Spin 9 to avoid total ruin.',
-    /* ---- new squares to reach 100 ---- */
-    'Payday',
-    'Tard card',
-    'Identity theft',
-    'Extortion',
-    'Lottery, spin a two or eight to win',
-    'Got caught on camera shoplifting, pay $400',
-    'Found cash in a Crown Royal bag, earn $350',
-    'Bachelor party side hustle, earn $700',
-    'Baby mama drama, lose a family member',
-    'Neighborhood brawl goes viral, spin times 100',
-    'Rent\'s due, pay $500',
-    'OnlyFans flop, pay $300 for lighting',
-    'Win a radio contest, earn $250',
-    'Stuck in detox, miss a turn',
-    'Payday',
-    'Tard card',
-    'Speed date disaster, go back three spaces',
-    'Hot streak at the slots, earn $1,000',
-    'High on shrooms, stumble forward one space',
-    'Arrested for jaywalking, pay $150',
-    'Finish, $5,000 to the first person who crosses.'
-  ];
-  const N_SQUARES = EVENTS.length; // = 100
+    // ====== ELEMENTS ======
+    const el = (id) => document.getElementById(id);
+    const serverUrlEl = el("serverUrl");
+    const connStateEl = el("connState");
+    const statusEl = el("status");
 
-  /* ===== TARD DECK (incl. 10 payoff cards) ===== */
-  const TARD_CARDS = [
-    'Grandma Joined a Cult – She ran off with a man named Moonbeam. Lose 1 family member.',
-    'Dad Arrested in the Dominican Republic – “It was just one drink!” Lose 1 family member.',
-    'Brother ODs – The good die young, the dumb die first. Lose 1 family member.',
-    'DNA Disaster – Turns out you’re not the dad. Lose 1 family member.',
-    'Family Car Fire – Somebody lit up while pumping gas. Lose 1 family member.',
-    'Mom Gets Fired from the Brothel – She’s moving in. Hope she brought Febreze. Gain 1 family member.',
-    'Meth Lab Explosion – Dad survived and needs a couch. Gain 1 family member.',
-    'Queer Cousin Gets Thrown Out – Glitter storm incoming. Gain 1 family member.',
-    'Surprise! You’re My Real Dad – Someone’s calling you “Daddy,” and not the fun kind. Gain 1 family member.',
-    'Bro Just Got Released – Fresh out and already asking for Wi-Fi. Gain 1 family member.',
-    'Karma’s Bitch – Reverse any money loss. You take back what they stole plus the same amount from them.',
-    'Block Their Blessing – Cancel another player’s money or bonus gain and take it for yourself.',
-    'Public Humiliation – Force whoever embarrassed you to perform the same dare or pay the same fine.',
-    'Take the Couch – Swap one family member between you and the offender. They lose one, you gain one.',
-    'Petty AF – Skip the next turn of whoever made you lose yours. Fair’s fair.',
-    'Scabies Breakout – Pay $200 per family member to get deloused.',
-    'Sing Us a Song (Do Your Worst) – $500 bonus if recorded.',
-    'Update Facebook: “OH MY GOD, I JUST WON THE LOTTERY!” – Enjoy the chaos.',
-    'Make the Person to Your Left Laugh – No touching. Fail? Pay $100.',
-    'Share Your Most Embarrassing Moment – Earn $200 if everyone cringes.',
-    'Eat a Red Chili Pepper – Survive a full turn without water to gain $500.',
-    'Give Your Neighbor a Pearl Necklace – No explanation required.',
-    'Draw Your Best Cocksucker Lips in 5 Seconds – No mirror, no shame.',
-    'Give Someone a Lap Dance – Collect $100 per blush.',
-    'Bad Trip – Woke up in another province. Lose 1 turn.',
-    'Repo Man – They took your car and your dignity. Lose your vehicle or pay $500.',
-    'Tax Refund Gone Wrong – CRA wants it back. Lose $1,000.',
-    'OnlyFans Fame – You’re trending! Gain $1,500, lose your job.',
-    'Evangelical Exorcism – They tried to pray the gay away. Lose $200 and your patience.',
-    'Public Urination Ticket – Caught behind a dumpster. Lose $300.',
-    'Drag Bingo Win – You slayed, honey. Gain $300.',
-    'Bad Investment – Crypto collapsed. Lose $1,500.',
-    'Power Outage Party – Host the block. Gain one social connection and $100.',
-    'STD Scare – Lose a turn and your dignity.',
-    'Eviction Notice – Move back home. Lose your apartment, gain one family member.',
-    /* +10 payoff cards */
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
-    'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.'
-  ];
-  let tardIndex = 0;
+    const createGameBtn = el("createGameBtn");
+    const gameCodeEl = el("gameCode");
+    const roleTagEl = el("roleTag");
 
-  /* ===== Characters (8) ===== */
-  const CHARACTERS = [
-    { name:'Slum Lord',         payday:6500, edu:'High School', paysOff:['Pornstar'] },
-    { name:'Gold Digger',       payday:7000, edu:'Dropout',     paysOff:['Porn Producer'], rentImmunityOnLanding:true },
-    { name:'Pimp',              payday:7000, edu:'High School', paysOff:['Dirty Cop'] },
-    { name:'Drug Dealer',       payday:6500, edu:'Dropout',     paysOff:[] },
-    { name:'Pornstar',          payday:6000, edu:'Dropout',     paysOff:['Pimp'] },
-    { name:'Porn Producer',     payday:7000, edu:'High School', paysOff:['Gold Digger'] },
-    { name:'Online Influencer', payday:6500, edu:'Dropout',     paysOff:['Dirty Cop'] },
-    { name:'Dirty Cop',         payday:6500, edu:'High School', paysOff:[] }
-  ];
+    const numPlayersSel = el("numPlayers");
+    const saveSettingsBtn = el("saveSettingsBtn");
+    const playersSavedEl = el("playersSaved");
+    const nameInputsWrap = el("nameInputs");
+    const lobbyListEl = el("lobbyList");
 
-  /* ===== State ===== */
-  let players = [];
-  let current = 0;
-  let spinning = false;
-  let voices = [];
-  let chosenVoice = null;
-  let currentAngle = 0;
+    const joinCodeEl = el("joinCode");
+    const joinNameEl = el("joinName");
+    const joinBtn = el("joinBtn");
 
-  // START MULTIPLAYER AUGMENTATION: New state variables
-  let socket = null; 
-  let gameCode = null; 
-  let myPlayerId = null; 
-  let isHost = false;
-  // END MULTIPLAYER AUGMENTATION
+    const gameCard = el("gameCard");
+    const currentPlayerEl = el("currentPlayer");
+    const playersTable = el("playersTable");
+    const spinBtn = el("spinBtn");
 
-  /* ===== Elements ===== */
-  const numPlayersSel = document.getElementById('numPlayers');
-  const buildNamesBtn = document.getElementById('buildNames');
-  const startBtn = document.getElementById('startBtn');
-  const spinBtn = document.getElementById('spinBtn');
-  const namesRow = document.getElementById('namesRow');
-  const statusEl = document.getElementById('status');
-  const boardEl = document.getElementById('track');
-  const playersEl = document.getElementById('players');
-  const logEl = document.getElementById('log');
-  const voiceSel = document.getElementById('voiceSel');
-  const deckCountEl = document.getElementById('deckCount');
-  
-  // START MULTIPLAYER AUGMENTATION: New UI elements
-  const createGameBtn = document.getElementById('createGameBtn');
-  const joinGameBtn = document.getElementById('joinGameBtn');
-  const gameCodeInput = document.getElementById('gameCodeInput');
-  const lobbyControls = document.getElementById('lobbyControls');
-  const gameLobby = document.getElementById('gameLobby');
-  const displayGameCode = document.getElementById('displayGameCode');
-  // END MULTIPLAYER AUGMENTATION
+    // ====== STATE ======
+    let socket = null;
+    let myId = null;
+    let currentCode = null;
+    let isHost = false;
+    let lastKnownState = null;
 
-  /* ===== Helpers ===== */
-  function updateDeckCount(){ deckCountEl.textContent = (TARD_CARDS.length - tardIndex) + ' / ' + TARD_CARDS.length; }
-  function shuffleTard(){ TARD_CARDS.sort(()=>Math.random()-0.5); tardIndex = 0; updateDeckCount(); }
-  function log(t){ logEl.textContent=(t+'\n')+logEl.textContent; }
-  function pickColor(i){ const pal=['#f44336','#2196f3','#4caf50','#ff9800','#e91e63','#00bcd4']; return pal[i%pal.length]; }
-
-  /* ===== Voices ===== */
-  function populateVoices(){
-    if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
-    voices = speechSynthesis.getVoices() || [];
-    voiceSel.innerHTML = '';
-    if(voices.length===0){ voiceSel.innerHTML='<option>(no voices)</option>'; chosenVoice=null; return; }
-    voices.forEach((v,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=`${v.name} — ${v.lang}`; voiceSel.appendChild(o); });
-    const idx = voices.findIndex(v=>/UK|British/i.test(v.name+v.lang) && /en/i.test(v.lang));
-    voiceSel.selectedIndex = idx>=0? idx:0; chosenVoice = voices[voiceSel.selectedIndex]||null;
-  }
-  if('speechSynthesis' in window){ populateVoices(); window.speechSynthesis.onvoiceschanged = populateVoices; }
-  voiceSel.addEventListener('change', e=>{ chosenVoice = voices[e.target.value]; });
-  function say(text){ if(!window.speechSynthesis || !text) return; const u=new SpeechSynthesisUtterance(text); if(chosenVoice) u.voice=chosenVoice; speechSynthesis.cancel(); speechSynthesis.speak(u); }
-  function sayDelayed(text,ms){ setTimeout(()=>say(text), ms||1100); }
-
-
-  // START MULTIPLAYER AUGMENTATION: Lobby & Socket Logic
-  function connectToServer(callback){
-      // FINAL FIX: Using wss:// to force secure WebSocket protocol to match GitHub Pages HTTPS
-      const RENDER_SERVER_URL = "wss://lowlife-server-1.onrender.com"; 
-
-      socket = io(RENDER_SERVER_URL);
-      
-      socket.on('connect', () => {
-          myPlayerId = socket.id; 
-          statusEl.textContent = 'Connected to server. Ready to create or join a game.';
-          callback && callback();
-      });
-
-      socket.on('gameCreated', (data) => {
-          gameCode = data.code;
-          isHost = data.isHost;
-          displayGameCode.textContent = data.code;
-          lobbyControls.style.display = 'none';
-          gameLobby.style.display = 'flex';
-          numPlayersSel.disabled = false;
-          buildNamesBtn.disabled = false;
-          statusEl.textContent = `Game created! Code: ${data.code}. Enter player names, then share the code.`;
-      });
-      
-      socket.on('gameJoined', (data) => {
-          gameCode = data.code;
-          isHost = data.isHost;
-          displayGameCode.textContent = data.code;
-          lobbyControls.style.display = 'none';
-          gameLobby.style.display = 'flex';
-          numPlayersSel.value = data.numPlayers; // Sync player count
-          statusEl.textContent = `Joined game ${data.code}. Waiting for host to start.`;
-          // Non-host players cannot set names/start
-          numPlayersSel.disabled = true;
-          buildNamesBtn.disabled = true;
-          startBtn.disabled = true;
-      });
-
-      socket.on('lobbyUpdate', (playersInLobby) => {
-          // You might want to update a visual list of players here
-          let names = playersInLobby.map(p => p.name).join(', ');
-          statusEl.textContent = `Lobby: ${playersInLobby.length} player(s) joined. Names: ${names}`;
-      });
-
-      socket.on('gameStarted', (initialState) => {
-          updateGameState(initialState);
-          statusEl.textContent = `Game started! ${players[current].name} to spin.`;
-          spinBtn.disabled = players[current].id !== myPlayerId; 
-          document.getElementById('namesRow').style.display = 'none';
-          document.getElementById('startBtn').style.display = 'none';
-          document.getElementById('numPlayers').style.display = 'none';
-      });
-
-      socket.on('gameStateUpdate', (newState) => {
-          updateGameState(newState);
-          spinBtn.disabled = players[current].id !== myPlayerId;
-      });
-      
-      socket.on('settingsUpdate', (numPlayers) => {
-          if (!isHost) {
-              numPlayersSel.value = numPlayers;
-              statusEl.textContent = `Host set max players to ${numPlayers}.`;
-          }
-      });
-
-      socket.on('error', (message) => {
-          // This should catch the error and display it to the user
-          statusEl.textContent = `Error: ${message}. Server connection failed.`;
-          log(message);
-      });
-  }
-
-  function updateGameState(newState){
-      players = newState.players;
-      current = newState.current;
-      tardIndex = newState.tardIndex;
-      
-      renderPlayers();
-      if(players.length > 0) highlightCell(players[current].position);
-      updateDeckCount();
-      statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`;
-  }
-
-  createGameBtn.addEventListener('click', () => {
-      if(!socket){ connectToServer(() => { createGameBtn.click(); }); return; }
-      socket.emit('createGame');
-  });
-
-  joinGameBtn.addEventListener('click', () => {
-      if(!socket){ connectToServer(() => { joinGameBtn.click(); }); return; }
-      const code = gameCodeInput.value.trim().toUpperCase();
-      const playerName = prompt("Enter your name:", `Player ${Math.floor(Math.random() * 100)}`);
-      if(code.length === 4 && playerName){
-          socket.emit('joinGame', { code: code, name: playerName });
-      } else {
-          statusEl.textContent = 'Please enter a 4-digit code and a name.';
+    // ====== HELPERS ======
+    function setStatus(msg, kind = "") {
+      const prefix = kind === "err" ? "❌ " : kind === "ok" ? "✅ " : kind === "warn" ? "⚠️ " : "";
+      statusEl.textContent = prefix + msg;
+      statusEl.className = "status " + (kind || "");
+    }
+    function toggleHostControls(enabled) {
+      createGameBtn.disabled = !enabled;
+      numPlayersSel.disabled = !enabled;
+      saveSettingsBtn.disabled = !enabled;
+    }
+    function ensureNameInputs(n) {
+      nameInputsWrap.innerHTML = "";
+      for (let i = 0; i < n; i++) {
+        const div = document.createElement("div");
+        const input = document.createElement("input");
+        input.placeholder = `Player ${i+1} name`;
+        input.id = `pname_${i}`;
+        div.appendChild(input);
+        nameInputsWrap.appendChild(div);
       }
-  });
-  // END MULTIPLAYER AUGMENTATION
-  
-  
-  /* ===== Names (Host only logic, now sends to server) ===== */
-  buildNamesBtn.addEventListener('click', ()=>{
-    if(!gameCode || !isHost) { statusEl.textContent = 'Only the host can manage player names.'; return; } 
-    
-    // Update server with max player count
-    socket.emit('updateSettings', { code: gameCode, numPlayers: numPlayersSel.value });
-
-    namesRow.innerHTML='';
-    const n = parseInt(numPlayersSel.value)||2;
-    for(let i=0;i<n;i++){
-      const inp=document.createElement('input');
-      inp.placeholder=`Player ${i+1} name`;
-      inp.id=`pname_${i}`;
-      inp.maxLength=20;
-      namesRow.appendChild(inp);
     }
-    startBtn.disabled=false;
-    statusEl.textContent='Enter names, then Start Game.';
-  });
-
-  /* ===== Start (Host only logic, now sends to server) ===== */
-  startBtn.addEventListener('click', ()=>{
-    if(!gameCode || !isHost) return;
-    const n=parseInt(numPlayersSel.value)||2;
-    const playerNames = [];
-    for(let i=0;i<n;i++){
-        playerNames.push((document.getElementById(`pname_${i}`)?.value||`Player ${i+1}`).trim());
+    function getNamesFromInputs(n) {
+      const names = [];
+      for (let i = 0; i < n; i++) {
+        const v = (el(`pname_${i}`)?.value || "").trim();
+        names.push(v || `Player ${i+1}`);
+      }
+      return names;
     }
-    socket.emit('startGame', { code: gameCode, names: playerNames });
-  });
-
-  /* ===== Board ===== */
-  function classify(text){
-    const t=text.toLowerCase();
-    if(t.startsWith('start'))return'start';
-    if(t.startsWith('finish'))return'finish';
-    if(t.includes('payday'))return'payday';
-    if(t.includes('tard card'))return'tard';
-    if(t.includes('bankruptcy'))return'bankruptcy';
-    if(t.includes('lottery'))return'lottery';
-    if(t.includes('identity theft'))return'idtheft';
-    if(t.includes('extortion'))return'extortion';
-    return'normal';
-  }
-  function shortLabel(text){
-    const t=text.toLowerCase();
-    if(t.includes('payday'))return'PAYDAY';
-    if(t.includes('tard card'))return'TARD';
-    if(t.includes('lottery'))return'LOTTO';
-    if(t.includes('bankruptcy'))return'BANKRUPT';
-    if(t.includes('identity theft'))return'ID THEFT';
-    if(t.includes('extortion'))return'EXTORT';
-    return text.length>22? text.slice(0,21)+'…':text;
-  }
-  function renderBoard(){
-    boardEl.innerHTML='';
-    for(let i=0;i<N_SQUARES;i++){
-      const text=EVENTS[i]; const kind=classify(text);
-      const c=document.createElement('div'); c.className='cell '+(kind==='normal'?'':kind);
-      c.dataset.index=i; c.title=text;
-      c.innerHTML=`<div><b>${i+1}</b><small>${shortLabel(text)}</small></div>`;
-      boardEl.appendChild(c);
+    function renderLobby(list) {
+      lobbyListEl.innerHTML = "";
+      (list || []).forEach((p,i) => {
+        const li = document.createElement("li");
+        li.textContent = `${i+1}. ${p.name || "Player"}`;
+        lobbyListEl.appendChild(li);
+      });
     }
-  }
-  function highlightCell(idx){
-    document.querySelectorAll('.cell').forEach(e=>e.classList.remove('active'));
-    const el=document.querySelector(`.cell[data-index="${idx}"]`);
-    if(el) el.classList.add('active');
-  }
-
-  /* ===== Spinner (tiny) ===== */
-  const wheel=document.getElementById('spinner-wheel');
-  (function buildSpinnerNumbers(){
-    for(let i=1;i<=10;i++){
-      const angle=(i-0.5)*36;
-      const d=document.createElement('div'); d.className='spinner-number'; d.textContent=i;
-      d.style.transform=`rotate(${angle}deg) translate(30px) rotate(-${angle}deg)`;
-      wheel.appendChild(d);
+    function renderPlayersTable(state) {
+      playersTable.innerHTML = "";
+      if (!state?.players) return;
+      state.players.forEach((p, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${idx+1}</td>
+          <td>${p.name || "-"}</td>
+          <td>${p.character?.name || "-"}</td>
+          <td>${typeof p.money === "number" ? "$" + p.money.toLocaleString() : "-"}</td>
+          <td>${p.position ?? "-"}</td>
+          <td>${p.lastMoneyDelta ? (p.lastMoneyDelta > 0 ? "+" : "") + "$" + Math.abs(p.lastMoneyDelta).toLocaleString() : "0"}</td>
+        `;
+        playersTable.appendChild(tr);
+      });
     }
-  })();
-
-  function randomSpinNumber(){ return Math.floor(Math.random()*10)+1; }
-  function animateToNumber(target){
-    const centerAngle=(target-0.5)*36;
-    const desiredMod=(270-centerAngle+360)%360;
-    const currentMod=((currentAngle%360)+360)%360;
-    const spins=6;
-    const delta=((desiredMod-currentMod+360)%360)+spins*360;
-    currentAngle+=delta;
-    wheel.style.transform=`rotate(${currentAngle}deg)`;
-  }
-  
-  // START MULTIPLAYER AUGMENTATION: Send spin action to server
-  function spinOnce(){
-    if(spinning || players.length===0 || spinBtn.disabled) return;
-    if(players[current].id !== myPlayerId) { 
-        say("It is not your turn.");
-        statusEl.textContent = "It is not your turn.";
-        return; 
-    }
-    
-    // Simulate spin animation locally while waiting for server response
-    spinning=true; spinBtn.disabled=true;
-    const landed=randomSpinNumber(); // This is just for local animation effect
-    animateToNumber(landed);
-    sayDelayed(`Spinning...`, 1200);
-
-    // Send the spin request to the server
-    socket.emit('playerSpin', { code: gameCode });
-    
-    // The server will handle the roll, logic, and send back a 'gameStateUpdate'
-    setTimeout(()=>{ spinning=false; },4000);
-  }
-  spinBtn.addEventListener('click', spinOnce);
-  // END MULTIPLAYER AUGMENTATION
-  
-  function showModal(title,body,buttons){
-    document.getElementById('modalTitle').textContent=title;
-    const bodyEl=document.getElementById('modalBody'); bodyEl.innerHTML='';
-    if(typeof body==='string') bodyEl.textContent=body; else bodyEl.appendChild(body);
-    const actions=document.getElementById('modalActions'); actions.innerHTML='';
-    (buttons||[{label:'OK',action:closeModal}]).forEach(b=>{
-      const btn=document.createElement('button'); btn.className='btn'; btn.textContent=b.label;
-      btn.onclick=()=>{ b.action && b.action(); };
-      actions.appendChild(btn);
-    });
-    document.getElementById('modal').style.display='flex';
-  }
-  function closeModal(){ document.getElementById('modal').style.display='none'; }
-
-  function renderPlayers(){
-    playersEl.innerHTML='';
-    players.forEach((p,i)=>{
-      const d=document.createElement('div'); d.className='card';
-      d.innerHTML=`<div class="title"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name} — ${p.character.name}</div>
-        <div>Edu: ${p.character.edu}</div>
-        <div>Payday: <span class="mono">$${p.character.payday.toLocaleString()}</span></div>
-        <div>Money: <span class="mono">$${p.money.toLocaleString()}</span> | Family: <span class="mono">${p.family}</span> <span class="delta">${p.lastMoneyDelta?`(${p.lastMoneyDelta>0?'+':''}${p.lastMoneyDelta})`:''}</span></div>
-        <div>Pos: <span class="mono">#${p.position+1}</span> — ${EVENTS[p.position]}</div>`;
-      if(i===current) d.style.outline='2px solid #ffd54f';
-      if(p.id === myPlayerId) d.style.boxShadow = '0 0 10px 2px #fff'; 
-      playersEl.appendChild(d);
-    });
-  }
-
-
-  /* ===== Init (Now calls connectToServer) ===== */
-  // START MULTIPLAYER AUGMENTATION
-  connectToServer();
-  // END MULTIPLAYER AUGMENTATION
-  
-  shuffleTard(); 
-  updateDeckCount(); 
-});
-</script>
-</body>
-</html>
+    function updateCurrentPlayerBadge(st
