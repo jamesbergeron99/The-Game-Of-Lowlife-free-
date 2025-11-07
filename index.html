@@ -38,7 +38,6 @@
   }
   .spinner-number{position:absolute;left:50%;top:50%;transform-origin:0 0;font-weight:900;font-size:10px;color:#000;text-shadow:0 0 2px #fff}
   #arrow{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #fff;z-index:5}
-  #spinBtn{min-width:100px}
 
   /* Main area: board takes remaining height; players dock at bottom */
   #main{display:flex;flex-direction:column;flex:1;min-height:0}
@@ -78,12 +77,15 @@
   <section id="topbar">
     <div id="controls">
       <label>Players:
-        <select id="numPlayers"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+        <select id="numPlayers">
+          <option>2</option><option>3</option><option>4</option>
+          <option>5</option><option>6</option><option>7</option><option>8</option>
+        </select>
       </label>
-      <button id="buildNames" class="btn">Set Names</button>
+      <button id="buildNames" class="btn" type="button">Set Names</button>
       <div id="namesRow" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      <button id="startBtn" class="btn" disabled>Start Game</button>
-      <button id="spinBtn" class="btn" disabled>SPIN</button>
+      <button id="startBtn" class="btn" type="button" disabled>Start Game</button>
+      <button id="spinBtn" class="btn" type="button" disabled>SPIN</button>
       <label>Voice: <select id="voiceSel"></select></label>
       <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
       <span id="status">Enter names, then Start Game.</span>
@@ -121,17 +123,116 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // Logo fallback text if image missing
+  // Logo fallback if image missing
   const logo = document.getElementById('logo');
   logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
 
-  /***** EVENTS (79) *****/
+  /* ===== 100 BOARD SQUARES (79 original + 21 new) ===== */
   const EVENTS = [
-    'Start','High school pregnancy, gain a family member','Sell weed at school, earn $500','Tard card','Payday','Breast implant bursts, pay $500 for surgery','Mom gets fired from the brothel, gain a family member','Identity theft','Waiting for dealer, miss a turn','Tard card','Payday','High on K, fall back two spaces','Pick a pocket, earn $200','Add to shit mix','Tard card','Bankruptcy, spend a five or nine to avoid financial ruin','Got fired as porn fluffer, miss next payday','Payday','Pay back payday loan, $600','Tard card','Extortion','Identity theft','Wake up and need stitches in your head, miss a turn','Drink the shit mix','Add to shit mix','Payday','Accidentally poison your spouse, lose a family member','Extortion','Dine and dash, earn $100','Lottery, spend three or nine to win','Payday','Tard card','Got a father\'s day abortion, lose a family member','Identity theft','Get laid off on your birthday, miss your next payday, do a shot','Gerbiling incident, pay $1,000 for removal','Payday','Shotgun wedding, gain a family member','Lottery, spend four or eight to win','Crazy brother won\'t leave, gain a family member','Tard card','Your TikTok goes viral, spin times 100','Get a massage with a happy ending, pay $300','Extortion','Ha ha, it\'s twins, gain a family member, times two','Payday','Feeling a bit tipsy, stumble forward one space','Bankruptcy, spin a three to avoid total ruin','Tard card','Get work as dildo tester, earn $1,000','Get a payday loan, earn $200','Fly to Thailand to get a vagina installed, pay $1,000','Family delousing, pay 500 per member','Payday','Lottery, spin a one to win','Bankruptcy, you\'re fucked','Identity theft','Tard card','Lost a kid at the mall, lose a family member','Got a part-time job as a porn fluffer, spin times 100','Payday','Drink the shit mix','Steal $1,000 from any player','Tard card','Extortion','Payday','Go back three spaces to look for phone','Lottery, spin a one or nine to win','Surprise! I\'m your kid. Gain a family member.','Identity theft','Sell used sex toys online. Spin x 50.','Tard card','Buy used sex toys online. Pay $300.','Payday','Arrested in the Dominican. Pay $5,000.','High on meth. Speed ahead two places.','Tard card','Bankruptcy. Spin 9 to avoid total ruin.','Finish, $5,000 to the first person who crosses.'
+    'Start',
+    'High school pregnancy, gain a family member',
+    'Sell weed at school, earn $500',
+    'Tard card',
+    'Payday',
+    'Breast implant bursts, pay $500 for surgery',
+    'Mom gets fired from the brothel, gain a family member',
+    'Identity theft',
+    'Waiting for dealer, miss a turn',
+    'Tard card',
+    'Payday',
+    'High on K, fall back two spaces',
+    'Pick a pocket, earn $200',
+    'Add to shit mix',
+    'Tard card',
+    'Bankruptcy, spend a five or nine to avoid financial ruin',
+    'Got fired as porn fluffer, miss next payday',
+    'Payday',
+    'Pay back payday loan, $600',
+    'Tard card',
+    'Extortion',
+    'Identity theft',
+    'Wake up and need stitches in your head, miss a turn',
+    'Drink the shit mix',
+    'Add to shit mix',
+    'Payday',
+    'Accidentally poison your spouse, lose a family member',
+    'Extortion',
+    'Dine and dash, earn $100',
+    'Lottery, spend three or nine to win',
+    'Payday',
+    'Tard card',
+    'Got a father\'s day abortion, lose a family member',
+    'Identity theft',
+    'Get laid off on your birthday, miss your next payday, do a shot',
+    'Gerbiling incident, pay $1,000 for removal',
+    'Payday',
+    'Shotgun wedding, gain a family member',
+    'Lottery, spend four or eight to win',
+    'Crazy brother won\'t leave, gain a family member',
+    'Tard card',
+    'Your TikTok goes viral, spin times 100',
+    'Get a massage with a happy ending, pay $300',
+    'Extortion',
+    'Ha ha, it\'s twins, gain a family member, times two',
+    'Payday',
+    'Feeling a bit tipsy, stumble forward one space',
+    'Bankruptcy, spin a three to avoid total ruin',
+    'Tard card',
+    'Get work as dildo tester, earn $1,000',
+    'Get a payday loan, earn $200',
+    'Fly to Thailand to get a vagina installed, pay $1,000',
+    'Family delousing, pay 500 per member',
+    'Payday',
+    'Lottery, spin a one to win',
+    'Bankruptcy, you\'re fucked',
+    'Identity theft',
+    'Tard card',
+    'Lost a kid at the mall, lose a family member',
+    'Got a part-time job as a porn fluffer, spin times 100',
+    'Payday',
+    'Drink the shit mix',
+    'Steal $1,000 from any player',
+    'Tard card',
+    'Extortion',
+    'Payday',
+    'Go back three spaces to look for phone',
+    'Lottery, spin a one or nine to win',
+    'Surprise! I\'m your kid. Gain a family member.',
+    'Identity theft',
+    'Sell used sex toys online. Spin x 50.',
+    'Tard card',
+    'Buy used sex toys online. Pay $300.',
+    'Payday',
+    'Arrested in the Dominican. Pay $5,000.',
+    'High on meth. Speed ahead two places.',
+    'Tard card',
+    'Bankruptcy. Spin 9 to avoid total ruin.',
+    /* ---- 79 → 100: NEW SQUARES ADDED BACK ---- */
+    'Payday',
+    'Tard card',
+    'Identity theft',
+    'Extortion',
+    'Lottery, spin a two or eight to win',
+    'Got caught on camera shoplifting, pay $400',
+    'Found cash in a Crown Royal bag, earn $350',
+    'Bachelor party side hustle, earn $700',
+    'Baby mama drama, lose a family member',
+    'Neighborhood brawl goes viral, spin times 100',
+    'Rent\'s due, pay $500',
+    'OnlyFans flop, pay $300 for lighting',
+    'Win a radio contest, earn $250',
+    'Stuck in detox, miss a turn',
+    'Payday',
+    'Tard card',
+    'Speed date disaster, go back three spaces',
+    'Hot streak at the slots, earn $1,000',
+    'High on shrooms, stumble forward one space',
+    'Arrested for jaywalking, pay $150',
+    'Finish, $5,000 to the first person who crosses.'
   ];
-  const N_SQUARES = EVENTS.length;
+  const N_SQUARES = EVENTS.length; // should be 100
 
-  /***** REAL TARD deck (from your PDF) + 10 Payoff Cards *****/
+  /* ===== TARD DECK restored (from your PDF vibe) + 10 payoff cards ===== */
   const TARD_CARDS = [
     'Grandma Joined a Cult – She ran off with a man named Moonbeam. Lose 1 family member.',
     'Dad Arrested in the Dominican Republic – “It was just one drink!” Lose 1 family member.',
@@ -168,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'Power Outage Party – Host the block. Gain one social connection and $100.',
     'STD Scare – Lose a turn and your dignity.',
     'Eviction Notice – Move back home. Lose your apartment, gain one family member.',
-    // +10 payoff cards
+    /* +10 payoff cards restored */
     'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
     'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
     'Payoff Card – You need to pay off the person assigned to your character card. Spin x 50.',
@@ -182,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
   let tardIndex = 0;
 
-  /***** Characters (8) *****/
+  /* ===== Characters (8) ===== */
   const CHARACTERS = [
     { name:'Slum Lord',         payday:6500, edu:'High School', paysOff:['Pornstar'] },
     { name:'Gold Digger',       payday:7000, edu:'Dropout',     paysOff:['Porn Producer'], rentImmunityOnLanding:true },
@@ -194,16 +295,15 @@ document.addEventListener('DOMContentLoaded', () => {
     { name:'Dirty Cop',         payday:6500, edu:'High School', paysOff:[] }
   ];
 
-  /***** State *****/
+  /* ===== State ===== */
   let players = [];
   let current = 0;
-  let lottoPot = 0;
   let spinning = false;
   let voices = [];
   let chosenVoice = null;
   let currentAngle = 0;
 
-  /***** Elements *****/
+  /* ===== Elements ===== */
   const numPlayersSel = document.getElementById('numPlayers');
   const buildNamesBtn = document.getElementById('buildNames');
   const startBtn = document.getElementById('startBtn');
@@ -216,133 +316,489 @@ document.addEventListener('DOMContentLoaded', () => {
   const voiceSel = document.getElementById('voiceSel');
   const deckCountEl = document.getElementById('deckCount');
 
-  /***** Helpers *****/
-  function updateDeckCount(){ if(deckCountEl){ deckCountEl.textContent = (TARD_CARDS.length - tardIndex) + ' / ' + TARD_CARDS.length; } }
+  /* ===== Helpers ===== */
+  function updateDeckCount(){ deckCountEl.textContent = (TARD_CARDS.length - tardIndex) + ' / ' + TARD_CARDS.length; }
   function shuffleTard(){ TARD_CARDS.sort(()=>Math.random()-0.5); tardIndex = 0; updateDeckCount(); }
+  function log(t){ logEl.textContent=(t+'\n')+logEl.textContent; }
+  function pickColor(i){ const pal=['#f44336','#2196f3','#4caf50','#ff9800','#e91e63','#00bcd4']; return pal[i%pal.length]; }
 
-  /***** Voices *****/
+  /* ===== Voices ===== */
   function populateVoices(){
-    voices = speechSynthesis.getVoices();
+    if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
+    voices = speechSynthesis.getVoices() || [];
     voiceSel.innerHTML = '';
+    if(voices.length===0){ voiceSel.innerHTML='<option>(no voices)</option>'; chosenVoice=null; return; }
     voices.forEach((v,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=`${v.name} — ${v.lang}`; voiceSel.appendChild(o); });
     const idx = voices.findIndex(v=>/UK|British/i.test(v.name+v.lang) && /en/i.test(v.lang));
     voiceSel.selectedIndex = idx>=0? idx:0; chosenVoice = voices[voiceSel.selectedIndex]||null;
   }
   if('speechSynthesis' in window){ populateVoices(); window.speechSynthesis.onvoiceschanged = populateVoices; }
   voiceSel.addEventListener('change', e=>{ chosenVoice = voices[e.target.value]; });
-  function say(text){ if(!window.speechSynthesis) return; const u=new SpeechSynthesisUtterance(text); if(chosenVoice) u.voice=chosenVoice; speechSynthesis.cancel(); speechSynthesis.speak(u); }
-  function sayDelayed(text,ms){ setTimeout(()=>say(text), ms||1200); }
+  function say(text){ if(!window.speechSynthesis || !text) return; const u=new SpeechSynthesisUtterance(text); if(chosenVoice) u.voice=chosenVoice; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+  function sayDelayed(text,ms){ setTimeout(()=>say(text), ms||1100); }
 
-  /***** Names *****/
+  /* ===== Names ===== */
   buildNamesBtn.addEventListener('click', ()=>{
     namesRow.innerHTML='';
     const n = parseInt(numPlayersSel.value)||2;
-    for(let i=0;i<n;i++){ const inp=document.createElement('input'); inp.placeholder=`Player ${i+1} name`; inp.id=`pname_${i}`; inp.maxLength=20; namesRow.appendChild(inp); }
-    startBtn.disabled=false; statusEl.textContent='Enter names, then Start Game.';
+    for(let i=0;i<n;i++){
+      const inp=document.createElement('input');
+      inp.placeholder=`Player ${i+1} name`;
+      inp.id=`pname_${i}`;
+      inp.maxLength=20;
+      namesRow.appendChild(inp);
+    }
+    startBtn.disabled=false;
+    statusEl.textContent='Enter names, then Start Game.';
   });
 
-  /***** Start *****/
+  /* ===== Start ===== */
   startBtn.addEventListener('click', ()=>{
-    const n=parseInt(numPlayersSel.value)||2; const pool=[...CHARACTERS]; players=[];
+    const n=parseInt(numPlayersSel.value)||2;
+    const pool=[...CHARACTERS];
+    players=[];
     for(let i=0;i<n;i++){
       const nm=(document.getElementById(`pname_${i}`)?.value||`Player ${i+1}`).trim();
-      const idx=Math.floor(Math.random()*pool.length); const char=pool.splice(idx,1)[0];
+      const idx=Math.floor(Math.random()*pool.length);
+      const char=pool.splice(idx,1)[0];
       players.push({id:i+1,name:nm,character:char,position:0,money:0,family:0,missNextTurn:false,missNextPayday:false,lastMoneyDelta:0,color:pickColor(i)});
     }
     // Dropouts spin first
     players.sort((a,b)=> (a.character.edu==='Dropout')===(b.character.edu==='Dropout')?0:(a.character.edu==='Dropout'?-1:1));
-    current=0; lottoPot=0; renderBoard(); renderPlayers(); highlightCell(0); spinBtn.disabled=false; statusEl.textContent=`Game on. ${players[current].name} (${players[current].character.name}) to spin.`;
+    current=0;
+    renderBoard(); renderPlayers(); highlightCell(0);
+    spinBtn.disabled=false;
+    statusEl.textContent=`Game on. ${players[current].name} (${players[current].character.name}) to spin.`;
   });
-  function pickColor(i){ const pal=['#f44336','#2196f3','#4caf50','#ff9800','#e91e63','#00bcd4']; return pal[i%pal.length]; }
 
-  /***** Board *****/
-  function classify(text){ const t=text.toLowerCase(); if(t.startsWith('start'))return'start'; if(t.startsWith('finish'))return'finish'; if(t.includes('payday'))return'payday'; if(t.includes('tard card'))return'tard'; if(t.includes('bankruptcy'))return'bankruptcy'; if(t.includes('lottery'))return'lottery'; if(t.includes('identity theft'))return'idtheft'; if(t.includes('extortion'))return'extortion'; return'normal'; }
-  function shortLabel(text){ const t=text.toLowerCase(); if(t.includes('payday'))return'PAYDAY'; if(t.includes('tard card'))return'TARD'; if(t.includes('lottery'))return'LOTTO'; if(t.includes('bankruptcy'))return'BANKRUPT'; if(t.includes('identity theft'))return'ID THEFT'; if(t.includes('extortion'))return'EXTORT'; return text.length>22? text.slice(0,21)+'…':text; }
-  function renderBoard(){ boardEl.innerHTML=''; for(let i=0;i<N_SQUARES;i++){ const text=EVENTS[i]; const kind=classify(text); const c=document.createElement('div'); c.className='cell '+(kind==='normal'?'':kind); c.dataset.index=i; c.title=text; c.innerHTML=`<div><b>${i+1}</b><small>${shortLabel(text)}</small></div>`; boardEl.appendChild(c);} }
-  function highlightCell(idx){ document.querySelectorAll('.cell').forEach(e=>e.classList.remove('active')); const el=document.querySelector(`.cell[data-index="${idx}"]`); if(el) el.classList.add('active'); }
+  /* ===== Board ===== */
+  function classify(text){
+    const t=text.toLowerCase();
+    if(t.startsWith('start'))return'start';
+    if(t.startsWith('finish'))return'finish';
+    if(t.includes('payday'))return'payday';
+    if(t.includes('tard card'))return'tard';
+    if(t.includes('bankruptcy'))return'bankruptcy';
+    if(t.includes('lottery'))return'lottery';
+    if(t.includes('identity theft'))return'idtheft';
+    if(t.includes('extortion'))return'extortion';
+    return'normal';
+  }
+  function shortLabel(text){
+    const t=text.toLowerCase();
+    if(t.includes('payday'))return'PAYDAY';
+    if(t.includes('tard card'))return'TARD';
+    if(t.includes('lottery'))return'LOTTO';
+    if(t.includes('bankruptcy'))return'BANKRUPT';
+    if(t.includes('identity theft'))return'ID THEFT';
+    if(t.includes('extortion'))return'EXTORT';
+    return text.length>22? text.slice(0,21)+'…':text;
+  }
+  function renderBoard(){
+    boardEl.innerHTML='';
+    for(let i=0;i<N_SQUARES;i++){
+      const text=EVENTS[i]; const kind=classify(text);
+      const c=document.createElement('div'); c.className='cell '+(kind==='normal'?'':kind);
+      c.dataset.index=i; c.title=text;
+      c.innerHTML=`<div><b>${i+1}</b><small>${shortLabel(text)}</small></div>`;
+      boardEl.appendChild(c);
+    }
+  }
+  function highlightCell(idx){
+    document.querySelectorAll('.cell').forEach(e=>e.classList.remove('active'));
+    const el=document.querySelector(`.cell[data-index="${idx}"]`);
+    if(el) el.classList.add('active');
+  }
 
-  /***** Spinner (tiny) *****/
+  /* ===== Spinner (tiny) ===== */
   const wheel=document.getElementById('spinner-wheel');
-  (function buildSpinnerNumbers(){ for(let i=1;i<=10;i++){ const angle=(i-0.5)*36; const d=document.createElement('div'); d.className='spinner-number'; d.textContent=i; d.style.transform=`rotate(${angle}deg) translate(30px) rotate(-${angle}deg)`; wheel.appendChild(d);} })();
-  function spinOnce(){ if(spinning)return; const landed=Math.floor(Math.random()*10)+1; const centerAngle=(landed-0.5)*36; const desiredMod=(270-centerAngle+360)%360; const currentMod=((currentAngle%360)+360)%360; const spins=6; const delta=((desiredMod-currentMod+360)%360)+spins*360; currentAngle+=delta; spinning=true; spinBtn.disabled=true; wheel.style.transform=`rotate(${currentAngle}deg)`; sayDelayed(`You spun a ${landed}.`,1200); setTimeout(()=>{ resolveSpin(landed); spinning=false; spinBtn.disabled=false; },4000); }
+  (function buildSpinnerNumbers(){
+    for(let i=1;i<=10;i++){
+      const angle=(i-0.5)*36;
+      const d=document.createElement('div'); d.className='spinner-number'; d.textContent=i;
+      d.style.transform=`rotate(${angle}deg) translate(30px) rotate(-${angle}deg)`;
+      wheel.appendChild(d);
+    }
+  })();
+
+  function randomSpinNumber(){ return Math.floor(Math.random()*10)+1; }
+  function animateToNumber(target){
+    const centerAngle=(target-0.5)*36;
+    const desiredMod=(270-centerAngle+360)%360;
+    const currentMod=((currentAngle%360)+360)%360;
+    const spins=6;
+    const delta=((desiredMod-currentMod+360)%360)+spins*360;
+    currentAngle+=delta;
+    wheel.style.transform=`rotate(${currentAngle}deg)`;
+  }
+  function spinOnce(){
+    if(spinning || players.length===0) return;
+    const landed=randomSpinNumber();
+    spinning=true; spinBtn.disabled=true;
+    animateToNumber(landed);
+    sayDelayed(`You spun a ${landed}.`,1200);
+    setTimeout(()=>{ resolveSpin(landed); spinning=false; spinBtn.disabled=false; },4000);
+  }
   spinBtn.addEventListener('click', spinOnce);
 
-  /***** Turn + rules *****/
-  function resolveSpin(roll){ const p=players[current]; if(!p) return; if(p.missNextTurn){ p.missNextTurn=false; log(`${p.name} misses this turn.`); next(); return; } moveBy(p,roll); renderPlayers(); next(); }
-  function processPayday(p){ if(p.missNextPayday){ p.missNextPayday=false; log(`${p.name} crosses PAYDAY — shot, no money.`); say(`${p.name} misses this payday.`); return;} moneyDelta(p,p.character.payday); log(`${p.name} crosses PAYDAY. +$${p.character.payday.toLocaleString()} (and do a shot).`); }
-  function moveBy(p,steps){ const start=p.position; for(let i=1;i<=steps;i++){ const idx=(start+i)%N_SQUARES; if(EVENTS[idx].toLowerCase().includes('payday')) processPayday(p);} p.position=(start+steps)%N_SQUARES; highlightCell(p.position);
-    // Rent Rule: pay $500 per family member (including self) to each occupant already on this square; Gold Digger is immune when she lands
-    chargeRent(p);
-    const text=EVENTS[p.position]; if(text.toLowerCase().includes('payday')){ moneyDelta(p,1000); log(`${p.name} lands on PAYDAY. +$1,000 bonus.`);} say(text); applySquare(p,text,p.position); }
+  /* ===== Turn + rules ===== */
+  function resolveSpin(roll){
+    const p=players[current]; if(!p) return;
+    if(p.missNextTurn){
+      p.missNextTurn=false;
+      log(`${p.name} misses this turn.`);
+      sayDelayed(`You spun a ${roll}, but you miss your turn.`, 350);
+      next(); return;
+    }
+    const summary=[];
+    moveBy(p,roll,summary);
+    renderPlayers();
+    endTurn(summary);
+  }
+  function endTurn(summary){
+    if(summary.length){
+      const msg = `Summary: ${summary.join(' ')}`;
+      log(msg);
+      sayDelayed(msg, 350);
+    }
+    current=(current+1)%players.length;
+    statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`;
+  }
 
-  // Rent Rule implementation
-  function chargeRent(p){
+  // Award for crossing a PAYDAY square (pay + shot). No bonus here.
+  function crossPayday(p,summary){
+    if(p.missNextPayday){
+      p.missNextPayday=false;
+      summary.push('Crossed PAYDAY: shot, no pay.');
+      log(`${p.name} crosses PAYDAY — shot, no money.`);
+      return;
+    }
+    moneyDelta(p,p.character.payday);
+    summary.push(`Crossed PAYDAY: +$${p.character.payday.toLocaleString()} and do a shot.`);
+    log(`${p.name} crosses PAYDAY. +$${p.character.payday.toLocaleString()} (and do a shot).`);
+  }
+
+  // Landing on PAYDAY = base pay (once) + $1,000 bonus
+  function landingPayday(p,summary){
+    crossPayday(p,summary);            // base pay exactly once
+    moneyDelta(p,1000);                // landing bonus
+    summary.push('Landing bonus: +$1,000.');
+    log(`${p.name} lands on PAYDAY. +$1,000 bonus.`);
+  }
+
+  function moveBy(p,steps,summary){
+    const start=p.position;
+
+    // Handle each crossing BEFORE landing (so crossing PAYDAY during movement pays)
+    for(let i=1;i<steps;i++){
+      const idx=(start+i)%N_SQUARES;
+      if(EVENTS[idx].toLowerCase().includes('payday')) crossPayday(p,summary);
+    }
+
+    // Land
+    p.position=(start+steps)%N_SQUARES;
+    highlightCell(p.position);
+
+    // Rent Rule on landing
+    chargeRent(p,summary);
+
+    const text=EVENTS[p.position];
+    const landingIsPayday = text.toLowerCase().includes('payday');
+
+    // Speak the tile text
+    say(text);
+
+    // Apply landing logic
+    if(landingIsPayday){ landingPayday(p,summary); }
+
+    applySquare(p,text,p.position,summary);
+  }
+
+  // Rent Rule
+  function chargeRent(p,summary){
     const others = players.filter(o => o!==p && o.position === p.position);
     if(others.length === 0) return;
     if(p.character && p.character.name === 'Gold Digger'){
+      summary.push('Rent immunity (Gold Digger).');
       log(`${p.name} (Gold Digger) lands on an occupied square — rent immunity.`);
       return;
     }
     const rent = 500 * Math.max(1, (p.family||0) + 1);
     others.forEach(o=>{
-      p.money -= rent;
-      o.money += rent;
-      p.lastMoneyDelta = -rent;
-      o.lastMoneyDelta = rent;
+      p.money -= rent; o.money += rent;
+      p.lastMoneyDelta = -rent; o.lastMoneyDelta = rent;
       log(`${p.name} pays $${rent.toLocaleString()} in rent to ${o.name}.`);
+      summary.push(`Paid $${rent} rent to ${o.name}.`);
     });
     renderPlayers();
   }
 
-  function showModal(title,body,buttons){ document.getElementById('modalTitle').textContent=title; const bodyEl=document.getElementById('modalBody'); bodyEl.innerHTML=''; if(typeof body==='string') bodyEl.textContent=body; else bodyEl.appendChild(body); const actions=document.getElementById('modalActions'); actions.innerHTML=''; (buttons||[{label:'OK',action:closeModal}]).forEach(b=>{ const btn=document.createElement('button'); btn.className='btn'; btn.textContent=b.label; btn.onclick=()=>{b.action&&b.action();}; actions.appendChild(btn); }); document.getElementById('modal').style.display='flex'; }
+  function showModal(title,body,buttons){
+    document.getElementById('modalTitle').textContent=title;
+    const bodyEl=document.getElementById('modalBody'); bodyEl.innerHTML='';
+    if(typeof body==='string') bodyEl.textContent=body; else bodyEl.appendChild(body);
+    const actions=document.getElementById('modalActions'); actions.innerHTML='';
+    (buttons||[{label:'OK',action:closeModal}]).forEach(b=>{
+      const btn=document.createElement('button'); btn.className='btn'; btn.textContent=b.label;
+      btn.onclick=()=>{ b.action && b.action(); };
+      actions.appendChild(btn);
+    });
+    document.getElementById('modal').style.display='flex';
+  }
   function closeModal(){ document.getElementById('modal').style.display='none'; }
 
-  function drawTardCard(p){ if(tardIndex>=TARD_CARDS.length) shuffleTard(); const card=TARD_CARDS[tardIndex++]; updateDeckCount(); log(`TARD: ${card}`); sayDelayed(card,1200); showModal('TARD CARD',card,[{label:'OK',action:()=>closeModal()}]); const t=card.toLowerCase();
-    if(t.includes('lose 1 family')){ familyDelta(p,-1); }
-    if(t.includes('gain 1 family')){ familyDelta(p,+1); }
-    if(t.includes('reverse any money loss')){ /* handled socially in play; no-op here */ }
-    if(t.includes('cancel another player’s money')||t.includes('cancel another player\'s money')){ /* no-op placeholder */ }
-    if(t.includes('skip the next turn')){ p.missNextTurn=true; }
-    if(t.includes('pay $200 per family')){ moneyDelta(p,-200*p.family); }
-    if(t.includes('bonus if recorded')){ /* bonus paid by house when validated */ }
-    if(t.includes('fail? pay $100')){ moneyDelta(p,-100); }
-    if(t.includes('earn $200')){ moneyDelta(p,200); }
-    if(t.includes('gain $500')){ moneyDelta(p,500); }
-    if(t.includes('collect $100 per blush')){ moneyDelta(p,100); }
-    if(t.includes('lose 1 turn')){ p.missNextTurn=true; }
-    if(t.includes('lose your vehicle')){ /* track in app */ }
-    if(t.includes('lose $1,000')){ moneyDelta(p,-1000); }
-    if(t.includes('gain $1,500')){ moneyDelta(p,1500); }
-    if(t.includes('lose $200')){ moneyDelta(p,-200); }
-    if(t.includes('lose $300')){ moneyDelta(p,-300); }
-    if(t.includes('gain $300')){ moneyDelta(p,300); }
-    if(t.includes('lose $1,500')){ moneyDelta(p,-1500); }
-    if(t.includes('gain one social connection')){ /* flavor only */ }
-    if(t.includes('eviction notice')){ familyDelta(p, +1); /* move back home: gain family */ }
+  function extraSpin(multiplier, announcePrefix, callback){
+    const roll = randomSpinNumber();
+    animateToNumber(roll);
+    sayDelayed(`${announcePrefix} You spun a ${roll}.`, 900);
+    setTimeout(()=>{ const amount=roll*multiplier; callback(amount, roll); }, 3000);
   }
 
-  function handleIdentityTheft(p){ if(players.length<=1){ log('No one to steal.'); return;} const wrap=document.createElement('div'); const sel=document.createElement('select'); players.forEach(o=>{ if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name} — ${o.character.name}`; sel.appendChild(opt);} }); wrap.innerHTML='<div>Choose a player to steal their identity (character card):</div>'; wrap.appendChild(sel); showModal('IDENTITY THEFT',wrap,[{label:'Cancel',action:closeModal},{label:'Steal',action:()=>{ const victim=players.find(x=>x.id===parseInt(sel.value)); if(!victim){ closeModal(); return;} const tmp=p.character; p.character=victim.character; victim.character=tmp; log(`${p.name} stole ${victim.name}'s identity. They now play as ${p.character.name}.`); sayDelayed(`${p.name} stole ${victim.name}'s identity.`,1200); renderPlayers(); closeModal(); }}]); }
+  function drawTardCard(p,summary){
+    if(tardIndex>=TARD_CARDS.length) shuffleTard();
+    const card=TARD_CARDS[tardIndex++]; updateDeckCount();
+    log(`TARD: ${card}`); sayDelayed(card,1100);
+    showModal('TARD CARD',card,[{label:'OK',action:()=>closeModal()}]);
 
-  function applySquare(p,text,idx){ const t=text.toLowerCase(); if(t.includes('identity theft')){ handleIdentityTheft(p); return;} if(t.includes('tard card')){ drawTardCard(p); return;} if(t.includes('earn $500')) moneyDelta(p,500); if(t.includes('earn $200')) moneyDelta(p,200); if(t.includes('earn $1,000')) moneyDelta(p,1000); if(t.includes('pay $500 for surgery')) moneyDelta(p,-500); if(t.includes('pay back payday loan')) moneyDelta(p,-600); if(t.includes('pay $300')) moneyDelta(p,-300); if(t.includes('pay $1,000')) moneyDelta(p,-1000); if(t.includes('pay 500 per member')) moneyDelta(p,-500*p.family); if(t.includes('pay $5,000')) moneyDelta(p,-5000); if(t.includes('gain a family member, times two')) familyDelta(p,+2); else if(t.includes('gain a family member')) familyDelta(p,+1); if(t.includes('lose a family member')) familyDelta(p,-1); if(t.includes('miss a turn')) p.missNextTurn=true; if(t.includes('miss next payday')) p.missNextPayday=true; if(t.includes('go back three')){ p.position=(p.position-3+N_SQUARES)%N_SQUARES; highlightCell(p.position);} if(t.includes('fall back two')){ p.position=(p.position-2+N_SQUARES)%N_SQUARES; highlightCell(p.position);} if(t.includes('stumble forward one')){ p.position=(p.position+1)%N_SQUARES; highlightCell(p.position);} if(t.includes('lottery')){ log('Lottery square: number-matching payout coming soon.'); } if(t.includes('bankruptcy')){ log('Bankruptcy square: rescue spin logic coming soon.'); } }
+    const t=card.toLowerCase();
+    if(t.includes('payoff card')){
+      const payees = p.character.paysOff||[];
+      const targets = players.filter(o => o!==p && payees.includes(o.character.name));
+      if(targets.length){
+        extraSpin(50, 'Payoff amount times fifty.', (amount, roll)=>{
+          targets.forEach(o=>{ p.money -= amount; o.money += amount; p.lastMoneyDelta=-amount; o.lastMoneyDelta=amount; });
+          renderPlayers();
+          log(`${p.name} pays $${amount.toLocaleString()} to ${targets.map(t=>t.name).join(', ')} (extra spin ${roll} × 50).`);
+          summary.push(`Payoff: paid $${amount} to ${targets.map(t=>t.name).join(', ')}.`);
+          sayDelayed(`${p.name} pays ${amount} dollars.`, 400);
+        });
+      }
+      return;
+    }
+    if(t.includes('lose 1 family')){ familyDelta(p,-1); summary.push('Family -1.'); }
+    if(t.includes('gain 1 family')){ familyDelta(p,+1); summary.push('Family +1.'); }
+    if(t.includes('skip the next turn')||t.includes('lose 1 turn')){ p.missNextTurn=true; summary.push('Miss next turn.'); }
+    if(t.includes('pay $200 per family')){ const amt=200*p.family; moneyDelta(p,-amt); summary.push(`Paid $${amt} for delousing.`); }
+    if(t.includes('pay $100')){ moneyDelta(p,-100); summary.push('Paid $100.'); }
+    if(t.includes('earn $200')){ moneyDelta(p,200); summary.push('Earned $200.'); }
+    if(t.includes('gain $500')){ moneyDelta(p,500); summary.push('Earned $500.'); }
+    if(t.includes('gain $300')){ moneyDelta(p,300); summary.push('Earned $300.'); }
+    if(t.includes('lose $1,000')){ moneyDelta(p,-1000); summary.push('Lost $1,000.'); }
+    if(t.includes('gain $1,500')){ moneyDelta(p,1500); summary.push('Earned $1,500.'); }
+    if(t.includes('lose $200')){ moneyDelta(p,-200); summary.push('Lost $200.'); }
+    if(t.includes('lose $300')){ moneyDelta(p,-300); summary.push('Lost $300.'); }
+    if(t.includes('lose $1,500')){ moneyDelta(p,-1500); summary.push('Lost $1,500.'); }
+    if(t.includes('eviction notice')){ familyDelta(p,+1); summary.push('Moved back home: Family +1.'); }
+  }
+
+  function handleIdentityTheft(p,summary){
+    if(players.length<=1){ log('No one to steal.'); return; }
+    const wrap=document.createElement('div');
+    const sel=document.createElement('select');
+    players.forEach(o=>{
+      if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name} — ${o.character.name}`; sel.appendChild(opt); }
+    });
+    wrap.innerHTML='<div>Choose a player to steal their identity (character card) and position:</div>';
+    wrap.appendChild(sel);
+    showModal('IDENTITY THEFT',wrap,[
+      {label:'Cancel',action:closeModal},
+      {label:'Steal',action:()=>{ const victim=players.find(x=>x.id===parseInt(sel.value));
+          if(!victim){ closeModal(); return; }
+          const tmpChar=p.character; p.character=victim.character; victim.character=tmpChar;
+          const tmpPos=p.position; p.position=victim.position; victim.position=tmpPos;
+          highlightCell(p.position);
+          log(`${p.name} stole ${victim.name}'s identity and position. Now ${p.character.name} at #${p.position+1}.`);
+          summary.push(`Identity Theft: stole ${victim.name}'s character and position (#${p.position+1}).`);
+          sayDelayed(`${p.name} stole ${victim.name}'s identity.`,1100);
+          renderPlayers(); closeModal();
+      }}]);
+  }
+
+  function bankruptcyRescue(p, textLower, summary){
+    if(textLower.includes("you're fucked")){ doBankrupt(p,summary); return; }
+    let avoids = new Set();
+    if(textLower.includes('spin a three')) avoids.add(3);
+    if(textLower.includes('spin 9')) avoids.add(9);
+    if(textLower.includes('five or nine') || textLower.includes('5 or 9')) { avoids.add(5); avoids.add(9); }
+    if(avoids.size===0){ avoids.add(5); avoids.add(9); }
+    const roll = randomSpinNumber();
+    animateToNumber(roll);
+    sayDelayed(`Bankruptcy rescue spin: ${roll}.`, 900);
+    setTimeout(()=>{
+      if(avoids.has(roll)){
+        log(`${p.name} rolled ${roll} and avoided bankruptcy.`);
+        summary.push(`Avoided bankruptcy with ${roll}.`);
+      }else{
+        doBankrupt(p,summary);
+      }
+    }, 3000);
+  }
+  function doBankrupt(p,summary){
+    const lost = p.money;
+    p.money = 0; p.lastMoneyDelta = -lost; renderPlayers();
+    log(`${p.name} is BANKRUPT — loses all money.`);
+    summary.push('Bankrupt: all money lost.');
+    sayDelayed(`${p.name}, you just went bankrupt. You lose all your money.`, 500);
+  }
+
+  function handleExtortion(p,summary){
+    if(players.length<=1){ log('No victim to extort.'); return; }
+    const wrap=document.createElement('div');
+    const sel=document.createElement('select');
+    players.forEach(o=>{
+      if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name} — ${o.character.name}`; sel.appendChild(opt); }
+    });
+    wrap.innerHTML='<div>Choose a player to extort (they pay you spin × 100):</div>';
+    wrap.appendChild(sel);
+    showModal('EXTORTION',wrap,[
+      {label:'Cancel',action:closeModal},
+      {label:'Extort',action:()=>{
+        const victim=players.find(x=>x.id===parseInt(sel.value));
+        if(!victim){ closeModal(); return; }
+        extraSpin(100,'Extortion — spin times one hundred.', (amount, roll)=>{
+          victim.money -= amount; victim.lastMoneyDelta = -amount;
+          p.money += amount; p.lastMoneyDelta = amount;
+          renderPlayers();
+          log(`${p.name} extorts $${amount.toLocaleString()} from ${victim.name} (roll ${roll} × 100).`);
+          summary.push(`Extorted $${amount} from ${victim.name}.`);
+          sayDelayed(`${victim.name} pays ${amount} dollars to ${p.name}.`, 400);
+          closeModal();
+        });
+      }}]);
+  }
+  function handleExtortionLikeSteal(p,amount,summary){
+    if(players.length<=1){ return; }
+    const wrap=document.createElement('div'); const sel=document.createElement('select');
+    players.forEach(o=>{ if(o!==p){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.name}`; sel.appendChild(opt);} });
+    wrap.innerHTML=`<div>Choose a player to steal $${amount.toLocaleString()} from:</div>`;
+    wrap.appendChild(sel);
+    showModal('STEAL',wrap,[
+      {label:'Cancel',action:closeModal},
+      {label:'Steal',action:()=>{
+        const victim=players.find(x=>x.id===parseInt(sel.value));
+        if(!victim){ closeModal(); return; }
+        victim.money -= amount; victim.lastMoneyDelta = -amount;
+        p.money += amount; p.lastMoneyDelta = amount;
+        renderPlayers();
+        log(`${p.name} steals $${amount.toLocaleString()} from ${victim.name}.`);
+        summary.push(`Stole $${amount} from ${victim.name}.`);
+        closeModal();
+      }}]);
+  }
 
   function moneyDelta(p,amt){ p.money+=amt; p.lastMoneyDelta=amt; renderPlayers(); log(`${p.name}: ${amt>=0?'+':''}$${Math.abs(amt).toLocaleString()}`); }
   function familyDelta(p,df){ p.family=Math.max(0,p.family+df); renderPlayers(); log(`${p.name}: family ${df>=0?'+':''}${df}`); }
-  function next(){ current=(current+1)%players.length; statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`; }
-  function renderPlayers(){ playersEl.innerHTML=''; players.forEach((p,i)=>{ const d=document.createElement('div'); d.className='card'; d.innerHTML=`<div class="title"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name} — ${p.character.name}</div>
+  function renderPlayers(){
+    playersEl.innerHTML='';
+    players.forEach((p,i)=>{
+      const d=document.createElement('div'); d.className='card';
+      d.innerHTML=`<div class="title"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name} — ${p.character.name}</div>
         <div>Edu: ${p.character.edu}</div>
         <div>Payday: <span class="mono">$${p.character.payday.toLocaleString()}</span></div>
         <div>Money: <span class="mono">$${p.money.toLocaleString()}</span> | Family: <span class="mono">${p.family}</span> <span class="delta">${p.lastMoneyDelta?`(${p.lastMoneyDelta>0?'+':''}${p.lastMoneyDelta})`:''}</span></div>
-        <div>Pos: <span class="mono">#${p.position+1}</span> — ${EVENTS[p.position]}</div>`; if(i===current) d.style.outline='2px solid #ffd54f'; playersEl.appendChild(d); }); }
-  function log(t){ logEl.textContent=(t+'\n')+logEl.textContent; }
+        <div>Pos: <span class="mono">#${p.position+1}</span> — ${EVENTS[p.position]}</div>`;
+      if(i===current) d.style.outline='2px solid #ffd54f';
+      playersEl.appendChild(d);
+    });
+  }
+  function next(){ current=(current+1)%players.length; statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`; }
 
-  // ===== Runtime sanity tests (console) =====
+  function applySquare(p,text,idx,summary){
+    const t=text.toLowerCase();
+
+    // Flavor callouts -> explicit summary lines
+    if(t.includes('waiting for dealer')){ summary.push('Waiting for dealer: you miss your next turn.'); }
+    if(t.includes('add to shit mix')){ summary.push('Add to the shit mix.'); }
+    if(t.includes('drink the shit mix')){ summary.push('Drink the shit mix.'); }
+
+    if(t.includes('identity theft')){ handleIdentityTheft(p,summary); return; }
+    if(t.includes('tard card')){ drawTardCard(p,summary); return; }
+    if(t.includes('extortion')){ handleExtortion(p,summary); }
+
+    // Extra spin “× N”
+    const spinTimesMatch = /spin(?:\s+times)?\s*[x×]?\s*(\d+)/i.exec(text);
+    if(spinTimesMatch){
+      const mult = parseInt(spinTimesMatch[1],10);
+      const earnLike = /sell|job|viral|work|tester|influencer|collect/i.test(text) && !/pay/i.test(text);
+      const payLike  = /pay/i.test(text) && !earnLike;
+      if(payLike){
+        extraSpin(mult, `Extra spin times ${mult}.`, (amount, roll)=>{
+          moneyDelta(p, -amount);
+          summary.push(`Paid $${amount} (extra spin ${roll} × ${mult}).`);
+        });
+      }else{
+        extraSpin(mult, `Extra spin times ${mult}.`, (amount, roll)=>{
+          moneyDelta(p, amount);
+          summary.push(`Earned $${amount} (extra spin ${roll} × ${mult}).`);
+        });
+      }
+      return;
+    }
+
+    // Money deltas
+    if(t.includes('earn $1000')||t.includes('earn $1,000')){ moneyDelta(p,1000); summary.push('Earned $1,000.'); }
+    if(t.includes('earn $700')){ moneyDelta(p,700); summary.push('Earned $700.'); }
+    if(t.includes('earn $500')){ moneyDelta(p,500); summary.push('Earned $500.'); }
+    if(t.includes('earn $400')){ moneyDelta(p,400); summary.push('Earned $400.'); }
+    if(t.includes('earn $350')){ moneyDelta(p,350); summary.push('Earned $350.'); }
+    if(t.includes('earn $300')){ moneyDelta(p,300); summary.push('Earned $300.'); }
+    if(t.includes('earn $250')){ moneyDelta(p,250); summary.push('Earned $250.'); }
+    if(t.includes('earn $200')){ moneyDelta(p,200); summary.push('Earned $200.'); }
+
+    if(t.includes('pay $700')){ moneyDelta(p,-700); summary.push('Paid $700.'); }
+    if(t.includes('pay $600')){ moneyDelta(p,-600); summary.push('Paid $600.'); }
+    if(t.includes('pay $500 for surgery')){ moneyDelta(p,-500); summary.push('Paid $500 for surgery.'); }
+    if(t.includes('pay $500') && !t.includes('for surgery')){ moneyDelta(p,-500); summary.push('Paid $500.'); }
+    if(t.includes('pay $400')){ moneyDelta(p,-400); summary.push('Paid $400.'); }
+    if(t.includes('pay $350')){ moneyDelta(p,-350); summary.push('Paid $350.'); }
+    if(t.includes('pay $300 for lighting')){ moneyDelta(p,-300); summary.push('Paid $300 for lighting.'); }
+    if(t.includes('pay $300')){ moneyDelta(p,-300); summary.push('Paid $300.'); }
+    if(t.includes('pay $200')){ moneyDelta(p,-200); summary.push('Paid $200.'); }
+    if(t.includes('pay 500 per member')){ const amt=500*p.family; moneyDelta(p,-amt); summary.push(`Paid $${amt} for family delousing.`); }
+    if(t.includes('pay $5,000')){ moneyDelta(p,-5000); summary.push('Paid $5,000.'); }
+    if(t.includes('pay $150')){ moneyDelta(p,-150); summary.push('Paid $150.'); }
+    if(t.includes('steal $1,000')){ handleExtortionLikeSteal(p,1000,summary); }
+
+    // Family
+    if(t.includes('gain a family member, times two')){ familyDelta(p,+2); summary.push('Family +2.'); }
+    else if(t.includes('gain a family member')){ familyDelta(p,+1); summary.push('Family +1.'); }
+    if(t.includes('lose a family member')){ familyDelta(p,-1); summary.push('Family -1.'); }
+
+    // Turn effects
+    if(t.includes('miss a turn') || t.includes('detox')){ p.missNextTurn=true; summary.push('Miss next turn.'); }
+    if(t.includes('miss next payday')){ p.missNextPayday=true; summary.push('Miss next payday.'); }
+    if(t.includes('do a shot')){ summary.push('Do a shot.'); }
+
+    // Position nudges -> chain immediately
+    if(t.includes('go back three')){
+      p.position=(p.position-3+N_SQUARES)%N_SQUARES; highlightCell(p.position);
+      const nxt=EVENTS[p.position]; summary.push('Moved back 3.');
+      applySquare(p,nxt,p.position,summary); return;
+    }
+    if(t.includes('fall back two')){
+      p.position=(p.position-2+N_SQUARES)%N_SQUARES; highlightCell(p.position);
+      const nxt=EVENTS[p.position]; summary.push('Moved back 2.');
+      applySquare(p,nxt,p.position,summary); return;
+    }
+    if(t.includes('stumble forward one') || t.includes('speed ahead two places')){
+      const jump = t.includes('speed ahead two') ? 2 : 1;
+      p.position=(p.position+jump)%N_SQUARES; highlightCell(p.position);
+      const nxt=EVENTS[p.position]; summary.push(`Moved forward ${jump}.`);
+      applySquare(p,nxt,p.position,summary); return;
+    }
+
+    // Lottery / Bankruptcy
+    if(t.includes('lottery')){ summary.push('Lottery square (manual for now).'); }
+    if(t.includes('bankruptcy')){ bankruptcyRescue(p, t, summary); }
+  }
+
+  /* ===== Self-checks ===== */
   try{
-    console.assert(Array.isArray(TARD_CARDS) && TARD_CARDS.length >= 35, 'TARD_CARDS length bad');
+    console.assert(EVENTS.length === 100, 'Board must have 100 squares.');
     console.assert(Array.isArray(CHARACTERS) && CHARACTERS.length === 8, 'CHARACTERS length must be 8');
-    console.assert(typeof chargeRent === 'function', 'chargeRent missing');
   }catch(e){ console.error('Self-test failed:', e); }
 
-  // Init
+  /* ===== Init ===== */
   shuffleTard();
   updateDeckCount();
 });
