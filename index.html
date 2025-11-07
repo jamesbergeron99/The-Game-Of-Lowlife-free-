@@ -367,8 +367,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // START MULTIPLAYER AUGMENTATION: Lobby & Socket Logic
   function connectToServer(callback){
-      // FINAL FIX: Using wss:// to force secure WebSocket protocol to match GitHub Pages HTTPS
-      const RENDER_SERVER_URL = "wss://lowlife-server-1.onrender.com"; 
+      // LIVE RENDER URL INJECTED HERE
+      const RENDER_SERVER_URL = "https://lowlife-server-1.onrender.com"; 
 
       socket = io(RENDER_SERVER_URL);
       
@@ -431,8 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       socket.on('error', (message) => {
-          // This should catch the error and display it to the user
-          statusEl.textContent = `Error: ${message}. Server connection failed.`;
+          statusEl.textContent = `Error: ${message}`;
           log(message);
       });
   }
