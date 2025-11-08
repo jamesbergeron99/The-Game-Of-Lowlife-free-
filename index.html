@@ -122,14 +122,14 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  /* ======== IMPORTANT: point to your Render server ======== */
+  /* ===== point to your Render server ===== */
   const SERVER_URL = "https://lowlife-server-1.onrender.com";
 
   let socket = null;
   let ONLINE = false, ROOM_CODE = "", MY_ID = null, IS_HOST = false;
   let handlersBound = false;
 
-  // ===== EVENTS (100 total; #99=Bankruptcy instant; #100=Finish) =====
+  /* ===== board (100 tiles; #99=Bankruptcy instant; #100=Finish) ===== */
   const EVENTS = [
     'Start','High school pregnancy, gain a family member','Sell weed at school, earn $500','Tard card','Payday',
     'Breast implant bursts, pay $500 for surgery','Mom gets fired from the brothel, gain a family member','Identity theft',
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'High on shrooms, stumble forward one space','Tard card','Bankruptcy — instant, no rescue.','Finish — first to cross gets $5,000 bonus.'
   ];
 
-  // ===== TARD deck =====
+  /* ===== TARD deck ===== */
   const TARD_CARDS = [
     'Grandma Joined a Cult – Lose 1 family member.',
     'Dad Arrested in the Dominican Republic – Lose 1 family member.',
@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'Payoff Card – Pay the person on your character card. Spin x 50.'
   ];
 
-  // ===== Characters (updated payouts & links; edu removed) =====
+  /* ===== Characters (your updated pay + payoff rules) ===== */
   const CHARACTERS = [
     { name:'Porn Producer',     payday:2500, paysOff:['Gold Digger'] },
     { name:'Pornstar',          payday:2000, paysOff:['Porn Producer'] },
@@ -218,10 +218,10 @@ document.addEventListener('DOMContentLoaded', () => {
     { name:'Pimp',              payday:3000, paysOff:['Gold Digger'] },
     { name:'Gold Digger',       payday:2500, paysOff:[], rentImmunityOnLanding:true },
     { name:'Slum Lord',         payday:3000, paysOff:['Pornstar'] },
-    { name:'Dirty Cop',         payday:2500, paysOff:[] }  // not specified; set to 2500
+    { name:'Dirty Cop',         payday:2500, paysOff:[] }  // assumed 2500
   ];
 
-  /* ===== UI elements ===== */
+  /* ===== UI refs ===== */
   const logo = document.getElementById('logo');
   logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
 
@@ -249,11 +249,30 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateDeckCount(){ deckCountEl.textContent = (TARD_CARDS.length - tardIndex) + ' / ' + TARD_CARDS.length; }
   function shuffleTard(){ TARD_CARDS.sort(()=>Math.random()-0.5); tardIndex = 0; updateDeckCount(); }
 
-  /* speech */
+  /* ===== Speech with de-dupe ===== */
   const speechQueue=[]; let speaking=false;
-  function queueSay(text){ if(!('speechSynthesis' in window)||!text) return; speechQueue.push(String(text)); if(!speaking) playNextUtterance(); }
-  function playNextUtterance(){ if(speechQueue.length===0){ speaking=false; return; } speaking=true; const text=speechQueue.shift();
-    const u=new SpeechSynthesisUtterance(text); if(chosenVoice) u.voice=chosenVoice; u.onend=()=>playNextUtterance(); try{ speechSynthesis.speak(u);}catch(e){ speaking=false; } }
+  const lastSay = {}; // tag -> {text, ts}
+  function queueSay(text){
+    if(!('speechSynthesis' in window) || !text) return;
+    speechQueue.push(String(text));
+    if(!speaking) playNextUtterance();
+  }
+  function say(tag, text, cooldownMs=2500){
+    const now=Date.now();
+    const prev=lastSay[tag];
+    if(prev && prev.text===text && (now-prev.ts)<cooldownMs) return; // drop duplicate
+    lastSay[tag] = { text, ts: now };
+    queueSay(text);
+  }
+  function playNextUtterance(){
+    if(speechQueue.length===0){ speaking=false; return; }
+    speaking=true;
+    const text=speechQueue.shift();
+    const u=new SpeechSynthesisUtterance(text);
+    if(chosenVoice) u.voice=chosenVoice;
+    u.onend = ()=> playNextUtterance();
+    try{ speechSynthesis.speak(u);}catch(e){ speaking=false; }
+  }
   function populateVoices(){
     if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
     voices=speechSynthesis.getVoices()||[]; voiceSel.innerHTML='';
@@ -408,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function applySquare(p, text, idx, summary){
     const t=text.toLowerCase();
 
-    // narration-only flags (don’t re-trigger)
+    // narration-only flags
     if(t.includes('waiting for dealer')) summary.push('You miss your next turn.');
     if(t.includes('add to shit mix')) summary.push('Add to the shit mix.');
     if(t.includes('drink the shit mix')) summary.push('Drink the shit mix.');
@@ -476,8 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const nxt=EVENTS[p.position]; applySquare(p,nxt,p.position,summary); return;
     }
 
-    // lotteries are house rules client-side
-    if(t.startsWith('lottery')){ /* no-op here */ }
+    if(t.startsWith('lottery')){ /* house rule */ }
 
     // bankruptcy
     if(t.includes('bankruptcy')){
@@ -503,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function advanceSteps(p, steps, summary){
-    // move one-by-one to correctly count intermediate PAYDAYs and finish
+    // move one-by-one to count intermediate PAYDAYs and finish
     for(let i=1;i<=steps;i++){
       const next=(p.position+1)%EVENTS.length;
       if(i<steps){
@@ -521,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlayers();
   }
 
-  /* ===== socket glue (single source of truth = server) ===== */
+  /* ===== socket glue ===== */
   function ensureSocket(){
     if (socket) return socket;
     socket = io(SERVER_URL, { transports: ["websocket"] });
@@ -538,19 +556,26 @@ document.addEventListener('DOMContentLoaded', () => {
       socket.on("gameStarted", ({ players: lobbyPlayers, currentPlayerId })=>{
         ONLINE = true;
 
-        // assign characters randomly from updated pool
-        const pool=[...CHARACTERS];
-        players = lobbyPlayers.map((lp,i)=>{
-          const idx=Math.floor(Math.random()*pool.length);
-          const char=pool.splice(idx,1)[0];
-          return { id: lp.id, name: lp.name, character: char, position:0, money:0, family:0, missNextTurn:false, missNextPayday:false, lastMoneyDelta:0, color:pickColor(i) };
-        });
+        // === DETERMINISTIC CHARACTER ASSIGNMENT (no per-client random) ===
+        // Sort players by stable id, then assign characters in order
+        const sorted = [...lobbyPlayers].sort((a,b)=> (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        const assignment = new Map();
+        sorted.forEach((lp,i)=> assignment.set(lp.id, CHARACTERS[i % CHARACTERS.length]));
+
+        players = lobbyPlayers.map((lp,i)=>({
+          id: lp.id,
+          name: lp.name,
+          character: assignment.get(lp.id),
+          position:0, money:0, family:0,
+          missNextTurn:false, missNextPayday:false,
+          lastMoneyDelta:0, color:pickColor(i)
+        }));
 
         current = Math.max(0, players.findIndex(p => p.id === currentPlayerId));
         renderBoard(); renderPlayers(); highlightCell(0); placeAllTokens();
         spinBtn.disabled = (players[current].id !== MY_ID);
         statusEl.textContent = `Online game on. ${players[current].name} (${players[current].character.name}) to spin.`;
-        queueSay(`Online game on. ${players[current].name}, ${players[current].character.name}. Your turn to spin.`);
+        say('turn', `Online game on. ${players[current].name}, ${players[current].character.name}. Your turn to spin.`);
         tardIndex = 0; updateDeckCount();
       });
 
@@ -559,42 +584,42 @@ document.addEventListener('DOMContentLoaded', () => {
         if (idx >= 0) current = idx;
         spinBtn.disabled = (players[current].id !== MY_ID);
         statusEl.textContent = `${players[current].name} (${players[current].character.name}) to spin.`;
-        queueSay(`${players[current].name}. ${players[current].character.name}. Your turn to spin.`);
+        say('turn', `${players[current].name}. ${players[current].character.name}. Your turn to spin.`);
       });
 
       socket.on("serverMoveSpin", ({ playerId, roll })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        spinning=true; spinBtn.disabled=true; queueSay(`You spun a ${roll}.`); animateToNumber(roll);
+        spinning=true; spinBtn.disabled=true; say('roll', `You spun a ${roll}.`, 1800); animateToNumber(roll);
         setTimeout(()=>{
           const summary=[]; advanceSteps(p, roll, summary);
-          if(summary.length) queueSay(`Summary: ${summary.join(' ')}`);
+          if(summary.length) say('summary', `Summary: ${summary.join(' ')}`, 1200);
           spinning=false; // turn advance comes from server
         }, 4000);
       });
 
       socket.on("serverExtraSpin", ({ playerId, roll, amount, multiplier })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        animateToNumber(roll); queueSay(`Extra spin ×${multiplier}. You spun a ${roll}.`);
+        animateToNumber(roll); say('extra', `Extra spin ×${multiplier}. You spun a ${roll}.`, 1500);
         if(window.__pendingExtraSpin){ const fn=window.__pendingExtraSpin; window.__pendingExtraSpin=null; setTimeout(()=>fn(amount, roll), 1600); }
       });
 
       socket.on("serverRescueSpin", ({ playerId, roll })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        animateToNumber(roll); queueSay(`Bankruptcy rescue spin: ${roll}.`);
+        animateToNumber(roll); say('rescue', `Bankruptcy rescue spin: ${roll}.`, 1500);
         if(window.__pendingRescueCheck){ const fn=window.__pendingRescueCheck; window.__pendingRescueCheck=null; setTimeout(()=>fn(roll), 1600); }
       });
 
       socket.on("serverTardDraw", ({ playerId, card, remaining })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
         showModal('TARD CARD', card, [{label:'OK',action:()=>closeModal()}]);
-        queueSay(card);                    // speak exactly the card
+        say('card', card, 1500);                      // speak exactly the card
         const summary=[]; applyTardCardEffects(p, card, summary); // apply once
         deckCountEl.textContent = `${remaining} / ${TARD_CARDS.length}`;
       });
 
       socket.on("finishBonusAwarded", ({ playerId, amount })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        moneyDelta(p, amount); queueSay(`Finish bonus awarded to ${p.name}: $${amount.toLocaleString()}.`);
+        moneyDelta(p, amount); say('finish', `Finish bonus awarded to ${p.name}: $${amount.toLocaleString()}.`, 1500);
       });
     }
     return socket;
