@@ -392,13 +392,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const deckCountEl = document.getElementById('deckCount');
   const wheel = document.getElementById('spinner-wheel');
 
-  /* === Speech (deduped) === */
+  /* === Speech (debounced and tagged) === */
+  const lastSpoken = new Map();
   function speak(tag, text, dedupeMs=2000){
     if(!('speechSynthesis' in window) || !text) return;
-    const key='__last_'+tag; const now=Date.now();
-    const prev=window[key]; if(prev && prev.text===text && (now-prev.ts)<dedupeMs) return;
-    window[key]={text,ts:now};
-    try{ speechSynthesis.cancel(); }catch(e){}
+    const key = String(tag);
+    const now=Date.now();
+    const prev=lastSpoken.get(key); 
+    if(prev && prev.text===text && (now-prev.ts)<dedupeMs) return;
+
+    // Stronger debouncing for turn-based voice cues
+    if (tag.startsWith('turn:') || tag.startsWith('roll:')) {
+        speechSynthesis.cancel();
+    }
+    
+    lastSpoken.set(key, {text,ts:now});
+    
     const u=new SpeechSynthesisUtterance(String(text));
     if(chosenVoice) u.voice = chosenVoice;
     try{ speechSynthesis.speak(u); }catch(e){}
@@ -502,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // e.g., "Lottery — spin three or nine to win."
     const m = text.toLowerCase().match(/spin\s+([a-z0-9]+)(?:\s+or\s+([a-z0-9]+))?/);
     if(!m) return [];
-    const wordMap={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+    const wordMap={one:1,two:2,three:3,four:4,five:5,nine:9,ten:10,six:6,seven:7,eight:8};
     const t1 = isNaN(+m[1]) ? wordMap[m[1]] : +m[1];
     const t2 = m[2] ? (isNaN(+m[2]) ? wordMap[m[2]] : +m[2]) : null;
     return t2 ? [t1,t2] : [t1];
@@ -739,11 +748,14 @@ document.addEventListener('DOMContentLoaded', () => {
   hostBtn.addEventListener('click', ()=>{
     const s=ensureSocket();
     s.emit("createRoom", {}, (res)=>{
-      if(!res?.ok){ setStatus('Host failed.'); return; }
-      ONLINE = true; ROOM_CODE=res.code; IS_HOST=true; roomBadge.textContent = `Room ${ROOM_CODE}`;
+      if(!res?.ok){ setStatus('Host failed: '+res?.error); return; }
+      ONLINE = true; ROOM_CODE=res.code; IS_HOST=true; 
+      mpCode.value=ROOM_CODE; setStatus('Attempting to join new room...');
+
       s.emit("joinRoom",{code:ROOM_CODE,name:(mpName.value||'Host').trim(),tardDeckSeed:TARD_CARDS},(jr)=>{
-        if(!jr?.ok){ setStatus('Join failed.'); return; }
-        MY_ID=jr.id; hostStartBtn.disabled=false; mpCode.value=ROOM_CODE; setStatus('Share the code with friends to join.');
+        if(!jr?.ok){ setStatus('Host join failed: '+jr?.error); return; }
+        MY_ID=jr.id; hostStartBtn.disabled=false; 
+        setStatus('Room created! Code: '+ROOM_CODE); roomBadge.textContent = `Room ${ROOM_CODE}`;
       });
     });
   });
