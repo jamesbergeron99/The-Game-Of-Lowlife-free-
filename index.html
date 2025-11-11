@@ -77,6 +77,7 @@
   <section id="topbar">
     <div id="controls">
       
+      <!-- START MULTIPLAYER AUGMENTATION: UI for creating/joining a game -->
       <div id="lobbyControls" style="display:flex; flex-wrap:wrap; gap:10px;">
         <button id="createGameBtn" class="btn" type="button">Create Game</button>
         <label>Game Code:
@@ -88,8 +89,11 @@
       <div id="gameLobby" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
           <span style="color:var(--accent); font-weight:700;">Invite Code: <span id="displayGameCode"></span></span>
       </div>
+      <!-- END MULTIPLAYER AUGMENTATION -->
+
       <label>Players:
-        <select id="numPlayers" disabled> <option>2</option><option>3</option><option>4</option>
+        <select id="numPlayers" disabled> <!-- Disabled initially -->
+          <option>2</option><option>3</option><option>4</option>
           <option>5</option><option>6</option><option>7</option><option>8</option>
         </select>
       </label>
@@ -101,6 +105,7 @@
       <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
       <span id="status">Enter names, then Start Game.</span>
 
+      <!-- Tiny spinner in the topbar so you never need to scroll -->
       <div id="spinnerWrap" title="Spin result is read aloud">
         <div id="spinner-container">
           <div id="spinner-wheel"></div>
@@ -131,7 +136,10 @@
   </div>
 </div>
 
+<!-- START MULTIPLAYER AUGMENTATION: Include Socket.IO -->
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<!-- END MULTIPLAYER AUGMENTATION -->
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Logo fallback if image missing
@@ -350,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function pickColor(i){ const pal=['#f44336','#2196f3','#4caf50','#ff9800','#e91e63','#00bcd4']; return pal[i%pal.length]; }
 
   /* ===== Voices ===== */
+  let isSpeaking = false;
   function populateVoices(){
     if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
     voices = speechSynthesis.getVoices() || [];
@@ -361,7 +370,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if('speechSynthesis' in window){ populateVoices(); window.speechSynthesis.onvoiceschanged = populateVoices; }
   voiceSel.addEventListener('change', e=>{ chosenVoice = voices[e.target.value]; });
-  function say(text){ if(!window.speechSynthesis || !text) return; const u=new SpeechSynthesisUtterance(text); if(chosenVoice) u.voice=chosenVoice; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+  
+  function say(text){ 
+    if(!window.speechSynthesis || !text || isSpeaking) return; 
+    const u=new SpeechSynthesisUtterance(text); 
+    if(chosenVoice) u.voice=chosenVoice; 
+    u.onstart = () => { isSpeaking = true; };
+    u.onend = () => { isSpeaking = false; };
+    speechSynthesis.cancel(); 
+    speechSynthesis.speak(u);
+  }
   function sayDelayed(text,ms){ setTimeout(()=>say(text), ms||1100); }
 
 
@@ -375,7 +393,17 @@ document.addEventListener('DOMContentLoaded', () => {
       socket.on('connect', () => {
           myPlayerId = socket.id; 
           statusEl.textContent = 'Connected to server. Ready to create or join a game.';
+          // Enable buttons only after connection is confirmed
+          createGameBtn.disabled = false;
+          joinGameBtn.disabled = false;
           callback && callback();
+      });
+      
+      socket.on('disconnect', () => {
+          statusEl.textContent = 'Disconnected from server. Refresh to reconnect.';
+          createGameBtn.disabled = true;
+          joinGameBtn.disabled = true;
+          spinBtn.disabled = true;
       });
 
       socket.on('gameCreated', (data) => {
@@ -404,7 +432,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       socket.on('lobbyUpdate', (playersInLobby) => {
-          // You might want to update a visual list of players here
           let names = playersInLobby.map(p => p.name).join(', ');
           statusEl.textContent = `Lobby: ${playersInLobby.length} player(s) joined. Names: ${names}`;
       });
@@ -419,8 +446,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       socket.on('gameStateUpdate', (newState) => {
+          // This should handle all state changes and TTS reads from the server
           updateGameState(newState);
           spinBtn.disabled = players[current].id !== myPlayerId;
+          
+          // New TTS function: read only the summary if it exists and we're not speaking
+          if (newState.summary && newState.summary.length > 0) {
+              const summaryText = newState.summary.join('. ');
+              sayDelayed(summaryText, 500); // Give time for UI update
+          }
       });
       
       socket.on('settingsUpdate', (numPlayers) => {
@@ -429,38 +463,51 @@ document.addEventListener('DOMContentLoaded', () => {
               statusEl.textContent = `Host set max players to ${numPlayers}.`;
           }
       });
+      
+      socket.on('rollResult', (roll) => {
+          animateToNumber(roll);
+          sayDelayed(`Rolled a ${roll}.`, 1200);
+      });
 
       socket.on('error', (message) => {
-          // This should catch the error and display it to the user
-          statusEl.textContent = `Error: ${message}. Server connection failed.`;
+          statusEl.textContent = `Error: ${message}`;
           log(message);
       });
   }
 
   function updateGameState(newState){
-      players = newState.players;
-      current = newState.current;
-      tardIndex = newState.tardIndex;
+      // Ensure all state fields are updated based on the authoritative server state
+      players = newState.players || [];
+      current = newState.current || 0;
+      tardIndex = newState.tardIndex || 0;
       
       renderPlayers();
-      if(players.length > 0) highlightCell(players[current].position);
+      if(players.length > 0 && players[current]) highlightCell(players[current].position);
       updateDeckCount();
-      statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`;
+      if (players.length > 0) {
+        statusEl.textContent=`${players[current].name} (${players[current].character.name}) to spin.`;
+      }
+      
   }
 
   createGameBtn.addEventListener('click', () => {
-      if(!socket){ connectToServer(() => { createGameBtn.click(); }); return; }
+      // Re-enable button after click to handle server wake-up delay gracefully
+      createGameBtn.disabled = true; 
+      if(!socket || socket.disconnected){ connectToServer(() => { createGameBtn.click(); }); return; }
       socket.emit('createGame');
   });
 
   joinGameBtn.addEventListener('click', () => {
-      if(!socket){ connectToServer(() => { joinGameBtn.click(); }); return; }
+      // Re-enable button after click to handle server wake-up delay gracefully
+      joinGameBtn.disabled = true;
+      if(!socket || socket.disconnected){ connectToServer(() => { joinGameBtn.click(); }); return; }
       const code = gameCodeInput.value.trim().toUpperCase();
       const playerName = prompt("Enter your name:", `Player ${Math.floor(Math.random() * 100)}`);
       if(code.length === 4 && playerName){
           socket.emit('joinGame', { code: code, name: playerName });
       } else {
           statusEl.textContent = 'Please enter a 4-digit code and a name.';
+          joinGameBtn.disabled = false; // Enable if input failed immediately
       }
   });
   // END MULTIPLAYER AUGMENTATION
@@ -569,11 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Simulate spin animation locally while waiting for server response
     spinning=true; spinBtn.disabled=true;
-    const landed=randomSpinNumber(); // This is just for local animation effect
-    animateToNumber(landed);
-    sayDelayed(`Spinning...`, 1200);
-
-    // Send the spin request to the server
+    // The client sends the signal, the server sends back the roll via 'rollResult' event
     socket.emit('playerSpin', { code: gameCode });
     
     // The server will handle the roll, logic, and send back a 'gameStateUpdate'
@@ -614,11 +657,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ===== Init (Now calls connectToServer) ===== */
   // START MULTIPLAYER AUGMENTATION
+  renderBoard();
+  shuffleTard(); 
+  updateDeckCount(); 
   connectToServer();
   // END MULTIPLAYER AUGMENTATION
   
-  shuffleTard(); 
-  updateDeckCount(); 
 });
 </script>
 </body>
