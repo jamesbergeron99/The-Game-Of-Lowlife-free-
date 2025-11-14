@@ -54,6 +54,31 @@
   #modal{display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:100;}
   #modal .sheet{background:#181921;border:1px solid #2a2a35;border-radius:12px;max-width:560px;width:92%;padding:16px;}
   .inline{display:inline-flex;gap:6px;align-items:center}
+  /* --- ANIMATION CSS --- */
+  .video-overlay{
+    display: none; 
+    position: fixed;
+    inset: 0;
+    z-index: 150; 
+    pointer-events: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.8); 
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+  }
+  .video-overlay.active {
+      opacity: 1;
+  }
+  .video-overlay video {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 12px;
+      box-shadow: 0 0 40px rgba(255, 213, 79, 0.8);
+  }
+  #bankruptVideo {
+      box-shadow: 0 0 40px rgba(183, 28, 28, 0.8); /* Red/Bankruptcy Glow */
+  }
 </style>
 </head>
 <body>
@@ -106,6 +131,13 @@
     <div id="modalBody" class="body" style="white-space:pre-wrap;line-height:1.4"></div>
     <div id="modalActions" class="actions" style="margin-top:12px;text-align:right"><button class="btn" onclick="closeModal()">OK</button></div>
   </div>
+</div>
+
+<div id="lotteryWinAnimation" class="video-overlay">
+    <video id="lotteryVideo" src="Lotto winner.mp4" playsinline></video>
+</div>
+<div id="bankruptFailAnimation" class="video-overlay">
+    <video id="bankruptVideo" src="Bankrupt.mp4" playsinline></video>
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -338,6 +370,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const voiceSel = document.getElementById('voiceSel');
   const deckCountEl = document.getElementById('deckCount');
   const wheel = document.getElementById('spinner-wheel');
+  
+  // VIDEO REFS
+  const lotteryAnim = document.getElementById('lotteryWinAnimation');
+  const lotteryVideo = document.getElementById('lotteryVideo');
+  const bankruptAnim = document.getElementById('bankruptFailAnimation');
+  const bankruptVideo = document.getElementById('bankruptVideo');
+  
+  // Video end handlers
+  lotteryVideo.onended = () => { stopVideoAnimation(lotteryAnim, lotteryVideo); };
+  bankruptVideo.onended = () => { stopVideoAnimation(bankruptAnim, bankruptVideo); };
+
 
   /* === Voice init === */
   if('speechSynthesis' in window){ populateVoices(); window.speechSynthesis.onvoiceschanged = populateVoices; }
@@ -397,6 +440,26 @@ document.addEventListener('DOMContentLoaded', () => {
     currentAngle+=delta; wheel.style.transform=`rotate(${currentAngle}deg)`;
   }
 
+  /* === NEW VIDEO ANIMATION HELPERS === */
+  function startVideoAnimation(overlayEl, videoEl){
+    videoEl.load();
+    overlayEl.style.display = 'flex';
+    requestAnimationFrame(() => {
+        overlayEl.classList.add('active');
+        videoEl.play().catch(e => console.error("Video playback failed:", e));
+    });
+  }
+
+  function stopVideoAnimation(overlayEl, videoEl){
+    videoEl.pause();
+    videoEl.currentTime = 0; 
+    overlayEl.classList.remove('active');
+    setTimeout(() => {
+        overlayEl.style.display = 'none';
+    }, 300);
+  }
+  /* ================================== */
+
   /* === Money/Family + lotto pot helpers === */
   function moneyDelta(p,amt){ p.money+=amt; p.lastMoneyDelta=amt; renderPlayers(); }
   function moneyDeltaBank(p, amt){ p.money+=amt; p.lastMoneyDelta=amt; renderPlayers(); if(amt<0){ lottoPot += Math.abs(amt); } }
@@ -435,12 +498,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const targets = parseLotteryTargets(text);
     window.__pendingExtraCheck = (roll)=>{
       if(targets.includes(roll)){
+        // WINNING LOGIC
         const winAmt = LOTTO_BASE_WIN + lottoPot;
         lottoPot = 0;
         moneyDelta(p, winAmt);
         summary.push(`LOTTO WIN! +$${winAmt.toLocaleString()} (includes pot).`);
         say(`Lottery win! You get $${winAmt.toLocaleString()}.`);
+        startVideoAnimation(lotteryAnim, lotteryVideo); // <-- Trigger Lottery Video on Win
       }else{
+        // LOSING LOGIC
         summary.push(`No lottery win (needed ${targets.join(' or ')}).`);
       }
     };
@@ -457,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.__pendingExtraSpin = (amount)=>{
         const payees=p.character.paysOff||[]; const targets=players.filter(o=>o!==p && payees.includes(o.character.name));
         if(targets.length){
-          targets.forEach(o=> moneyDeltaTransfer(p,o,amount));
+          targets.forEach(o=> moneyDeltaTransfer(p,o,amount););
           summary.push(`Payoff: -$${amount.toLocaleString()} to ${targets.map(t=>t.name).join(', ')}.`);
           say(`Payoff paid $${amount.toLocaleString()} to ${targets.map(t=>t.name).join(', ')}.`);
         } else {
@@ -580,6 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(t.includes('instant, no rescue') || t.includes("you're fucked")){
         const lost=p.money; p.money=0; p.lastMoneyDelta=-lost; renderPlayers();
         summary.push('Bankrupt. Lost all money.'); say(`${p.name}, you just went bankrupt. You lose all your money.`);
+        startVideoAnimation(bankruptAnim, bankruptVideo); // <-- Trigger Bankrupt Video on Instant Fail
       } else {
         let avoids=new Set();
         if(t.includes('spin a three')) avoids.add(3);
@@ -588,7 +655,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if(avoids.size===0){ avoids.add(5); avoids.add(9); }
         window.__pendingRescueCheck = (roll)=>{
           if(avoids.has(roll)){ summary.push(`Avoided bankruptcy with ${roll}.`); say(`Avoided bankruptcy with ${roll}.`); }
-          else{ const lost=p.money; p.money=0; p.lastMoneyDelta=-lost; renderPlayers(); summary.push('Bankrupt. Lost all money.'); say(`${p.name}, you just went bankrupt. You lose all your money.`); }
+          else{ 
+            const lost=p.money; p.money=0; p.lastMoneyDelta=-lost; renderPlayers(); 
+            summary.push('Bankrupt. Lost all money.'); say(`${p.name}, you just went bankrupt. You lose all your money.`); 
+            startVideoAnimation(bankruptAnim, bankruptVideo); // <-- Trigger Bankrupt Video on Rescue Fail
+          }
         };
         ensureSocket().emit("requestRescueSpin",{code:ROOM_CODE,playerId:p.id},()=>{});
       }
