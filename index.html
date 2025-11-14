@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentAngle+=delta; wheel.style.transform=`rotate(${currentAngle}deg)`;
   }
 
-  /* === NEW VIDEO ANIMATION HELPERS === */
+  /* === VIDEO ANIMATION HELPERS === */
   function startVideoAnimation(overlayEl, videoEl){
     videoEl.load();
     overlayEl.style.display = 'flex';
@@ -818,15 +818,36 @@ document.addEventListener('DOMContentLoaded', () => {
     return socket;
   }
 
-  /* === UI actions === */
+  /* === UI actions (FIXED HOSTING LOGIC) === */
   hostBtn.addEventListener('click', ()=>{
     const s=ensureSocket();
+    const hostName = (mpName.value||'Host').trim();
+    
     s.emit("createRoom", {}, (res)=>{
-      if(!res?.ok){ statusEl.textContent='Host failed.'; return; }
-      ONLINE = true; ROOM_CODE=res.code; IS_HOST=true; roomBadge.textContent = `Room ${ROOM_CODE}`;
-      s.emit("joinRoom",{code:ROOM_CODE,name:(mpName.value||'Host').trim(),tardDeckSeed:TARD_CARDS},(jr)=>{
-        if(!jr?.ok){ statusEl.textContent='Join failed.'; return; }
-        MY_ID=jr.id; hostStartBtn.disabled=false; mpCode.value=ROOM_CODE; statusEl.textContent='Share the code with friends to join.';
+      if(!res || !res.ok || !res.code){ 
+        statusEl.textContent='Host failed: Could not create room.'; 
+        return; 
+      }
+      
+      const code = res.code;
+      
+      // Try to join the room just created
+      s.emit("joinRoom",{code,name:hostName,tardDeckSeed:TARD_CARDS},(jr)=>{
+        if(!jr || !jr.ok){ 
+          statusEl.textContent = jr?.error || 'Join failed after hosting.'; 
+          return; 
+        }
+        
+        // Successful Host + Join
+        ONLINE = true; 
+        ROOM_CODE = code; 
+        MY_ID = jr.id;
+        IS_HOST = true; 
+        
+        mpCode.value = ROOM_CODE; // Display code in input field
+        roomBadge.textContent = `Room ${ROOM_CODE}`; // Display code in badge
+        hostStartBtn.disabled = false; 
+        statusEl.textContent = `Room ${ROOM_CODE} hosted! Share the code with friends to join.`;
       });
     });
   });
