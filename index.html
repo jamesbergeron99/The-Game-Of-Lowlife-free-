@@ -737,13 +737,29 @@ document.addEventListener('DOMContentLoaded', () => {
     ]);
   }
 
-  /* === Socket glue === */
+  /* === Socket glue & Diagnostics === */
   function ensureSocket(){
     if (socket) return socket;
+    
+    console.log(`[SOCKET] Attempting connection to: ${SERVER_URL}`);
     socket = io(SERVER_URL, { transports:["websocket","polling"], path:"/socket.io", reconnection:true, reconnectionAttempts:10, timeout:20000 });
 
     if (!handlersBound){
       handlersBound = true;
+      
+      // DIAGNOSTIC LISTENERS
+      socket.on("connect", () => {
+        console.log(`[SOCKET] Connected successfully! ID: ${socket.id}`);
+        if(!ONLINE) statusEl.textContent = "Connected to server. Host or Join to begin.";
+      });
+      socket.on("disconnect", (reason) => {
+        console.error(`[SOCKET] Disconnected. Reason: ${reason}`);
+        if(ONLINE) statusEl.textContent = `Disconnected. Attempting reconnect... Reason: ${reason}`;
+      });
+      socket.on("connect_error", (error) => {
+        console.error(`[SOCKET] Connection Error:`, error);
+        statusEl.textContent = "CONNECTION ERROR. Check server status or console for details.";
+      });
 
       socket.on("lobbyUpdate", ({ players: lobbyPlayers, hostId, code })=>{
         roomBadge.textContent = `Room ${code} — ${lobbyPlayers.map(p=>p.name).join(", ")}`;
@@ -822,10 +838,12 @@ document.addEventListener('DOMContentLoaded', () => {
   hostBtn.addEventListener('click', ()=>{
     const s=ensureSocket();
     const hostName = (mpName.value||'Host').trim();
+    statusEl.textContent = "Attempting to host room...";
     
     s.emit("createRoom", {}, (res)=>{
+      console.log("[HOST] createRoom response:", res);
       if(!res || !res.ok || !res.code){ 
-        statusEl.textContent='Host failed: Could not create room.'; 
+        statusEl.textContent=`Host failed: Could not create room. Server error: ${res?.error || 'No code returned.'}`; 
         return; 
       }
       
@@ -833,6 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Try to join the room just created
       s.emit("joinRoom",{code,name:hostName,tardDeckSeed:TARD_CARDS},(jr)=>{
+        console.log("[HOST] joinRoom response:", jr);
         if(!jr || !jr.ok){ 
           statusEl.textContent = jr?.error || 'Join failed after hosting.'; 
           return; 
@@ -844,8 +863,8 @@ document.addEventListener('DOMContentLoaded', () => {
         MY_ID = jr.id;
         IS_HOST = true; 
         
-        mpCode.value = ROOM_CODE; // Display code in input field
-        roomBadge.textContent = `Room ${ROOM_CODE}`; // Display code in badge
+        mpCode.value = ROOM_CODE; 
+        roomBadge.textContent = `Room ${ROOM_CODE}`; 
         hostStartBtn.disabled = false; 
         statusEl.textContent = `Room ${ROOM_CODE} hosted! Share the code with friends to join.`;
       });
@@ -854,8 +873,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   joinBtn.addEventListener('click', ()=>{
     const code=(mpCode.value||'').trim().toUpperCase(); if(code.length!==4){ statusEl.textContent='Enter a 4-letter code.'; return; }
+    statusEl.textContent = "Attempting to join room...";
     const s=ensureSocket();
     s.emit("joinRoom",{code,name:(mpName.value||'Player').trim(),tardDeckSeed:TARD_CARDS},(jr)=>{
+      console.log("[JOIN] joinRoom response:", jr);
       if(!jr?.ok){ statusEl.textContent = jr.error || 'Join failed.'; return; }
       ONLINE = true; ROOM_CODE=code; MY_ID=jr.id; IS_HOST=jr.isHost; hostStartBtn.disabled=!IS_HOST; statusEl.textContent='Joined room. Waiting for host to start.';
     });
