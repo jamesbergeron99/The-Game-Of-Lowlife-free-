@@ -834,27 +834,32 @@ document.addEventListener('DOMContentLoaded', () => {
     return socket;
   }
 
-  /* === UI actions (FIXED HOSTING LOGIC) === */
+  /* === UI actions (FIXED HOSTING LOGIC with DIAGNOSTICS) === */
   hostBtn.addEventListener('click', ()=>{
     const s=ensureSocket();
     const hostName = (mpName.value||'Host').trim();
     statusEl.textContent = "Attempting to host room...";
     
+    console.log("[DIAG] 1. Starting host process. Checking socket connection...");
+    
     // 1. Request room creation
     s.emit("createRoom", {}, (res)=>{
-      console.log("[HOST] createRoom response:", res);
+      console.log("[DIAG] 2. Received createRoom response:", res);
       if(!res || !res.ok || !res.code){ 
         statusEl.textContent=`Host failed: Could not create room. Server error: ${res?.error || 'No code returned.'}`; 
+        console.error("[DIAG] FAILED at Step 2: createRoom returned an error or no code.", res);
         return; 
       }
       
       const code = res.code;
+      console.log(`[DIAG] 3. Room created successfully. Code: ${code}. Attempting to join...`);
       
       // 2. Automatically join the room just created
       s.emit("joinRoom",{code,name:hostName,tardDeckSeed:TARD_CARDS},(jr)=>{
-        console.log("[HOST] joinRoom response:", jr);
+        console.log("[DIAG] 4. Received joinRoom response:", jr);
         if(!jr || !jr.ok){ 
           statusEl.textContent = jr?.error || 'Join failed after hosting.'; 
+          console.error("[DIAG] FAILED at Step 4: joinRoom returned an error.", jr);
           return; 
         }
         
@@ -868,6 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
         roomBadge.textContent = `Room ${ROOM_CODE}`; 
         hostStartBtn.disabled = !IS_HOST; 
         statusEl.textContent = `Room ${ROOM_CODE} hosted! Share the code with friends to join.`;
+        console.log("[DIAG] 5. SUCCESS: Hosted and Joined. UI updated.");
       });
     });
   });
