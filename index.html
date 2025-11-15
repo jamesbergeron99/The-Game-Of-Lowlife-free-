@@ -840,6 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hostName = (mpName.value||'Host').trim();
     statusEl.textContent = "Attempting to host room...";
     
+    // 1. Request room creation
     s.emit("createRoom", {}, (res)=>{
       console.log("[HOST] createRoom response:", res);
       if(!res || !res.ok || !res.code){ 
@@ -849,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const code = res.code;
       
-      // Try to join the room just created
+      // 2. Automatically join the room just created
       s.emit("joinRoom",{code,name:hostName,tardDeckSeed:TARD_CARDS},(jr)=>{
         console.log("[HOST] joinRoom response:", jr);
         if(!jr || !jr.ok){ 
@@ -861,11 +862,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ONLINE = true; 
         ROOM_CODE = code; 
         MY_ID = jr.id;
-        IS_HOST = true; 
+        IS_HOST = jr.isHost; 
         
         mpCode.value = ROOM_CODE; 
         roomBadge.textContent = `Room ${ROOM_CODE}`; 
-        hostStartBtn.disabled = false; 
+        hostStartBtn.disabled = !IS_HOST; 
         statusEl.textContent = `Room ${ROOM_CODE} hosted! Share the code with friends to join.`;
       });
     });
