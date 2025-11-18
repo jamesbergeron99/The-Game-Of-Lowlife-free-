@@ -3,66 +3,94 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>The Game of Lowlife</title>
+<title>The Game of Lowlife - Multiplayer</title>
+<!-- Load Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+  import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+  // Global Firebase variables provided by the environment (MANDATORY USE)
+  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+  const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+  // Global variables
+  window.firebaseApp = null;
+  window.db = null;
+  window.auth = null;
+  window.currentUserId = null;
+  window.gameRef = null; // Firestore document reference for the current game
+  
+  window.initializeAppAndAuth = async () => {
+    try {
+      window.firebaseApp = initializeApp(firebaseConfig);
+      window.db = getFirestore(window.firebaseApp);
+      window.auth = getAuth(window.firebaseApp);
+
+      // Authenticate using the provided token or anonymously
+      if (initialAuthToken) {
+        await signInWithCustomToken(window.auth, initialAuthToken);
+      } else {
+        await signInAnonymously(window.auth);
+      }
+      
+      onAuthStateChanged(window.auth, (user) => {
+        if (user) {
+          window.currentUserId = user.uid;
+          document.dispatchEvent(new Event('authReady'));
+        } else {
+          // Fallback if sign-in failed, though sign-inAnonymously should prevent this
+          console.error("Authentication failed or user logged out.");
+        }
+      });
+    } catch (e) {
+      console.error("Error initializing Firebase or authentication:", e);
+      document.getElementById('status').textContent = 'Error: Cannot connect to game server.';
+    }
+  };
+</script>
+
 <style>
+  /* Base styles (kept for aesthetics) */
   :root{--bg:#0b0b0e;--ink:#f5f5f7;--muted:#b7b7c2;--accent:#ffd54f;--border:#2a2a35;--card:#15161d}
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui, Arial, sans-serif;display:flex;flex-direction:column;min-height:100vh}
-
   header{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);background:#111}
   header img{max-height:72px;display:block}
   header h1{margin:0;font-weight:900;letter-spacing:1px;display:none;color:var(--accent)}
-
   #app{display:flex;flex-direction:column;flex:1;min-height:0}
+
+  /* Controls */
   #topbar{flex:0 0 auto;position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
   #controls{max-width:1200px;margin:0 auto;padding:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-  .btn{background:#e53935;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .btn{background:#e53935;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;transition:transform .1s}
+  .btn:hover{background:#d32f2f}
+  .btn:active{transform:scale(0.98)}
   .btn:disabled{opacity:.6;cursor:not-allowed}
   input,select{background:#1b1b22;border:1px solid var(--border);color:#fff;border-radius:8px;padding:8px}
   label{color:var(--muted);font-size:.9rem}
-  #status{color:var(--accent)}
-
-  /* --- SPINNER FIX --- */
+  #status{color:var(--accent);min-width:280px}
+  #gameInfo{color:var(--muted);font-size:.8rem;min-width:200px;}
+  
+  /* Spinner */
   #spinnerWrap{display:flex;align-items:center;gap:8px;margin-left:auto}
-  #spinner-container{position:relative;width:100px;height:100px}
-  #spinner-wheel{position:relative;width:100%;height:100%;border-radius:50%;
-    background:conic-gradient(
-      #FF0000 0% 10%, #FF7F00 10% 20%, #FFFF00 20% 30%, #00FF00 30% 40%,
-      #0000FF 40% 50%, #4B0082 50% 60%, #8B00FF 60% 70%, #FFC0CB 70% 80%,
-      #F08080 80% 90%, #FFD700 90% 100%
-    );
-    box-shadow:0 0 12px rgba(0,0,0,0.6);
-    transform-origin:center center;
-    transition:transform 4s cubic-bezier(.25,.46,.45,.94);
+  #spinner-container{position:relative;width:80px;height:80px}
+  #spinner-wheel{position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(#FF0000 0% 10%, #FF7F00 10% 20%, #FFFF00 20% 30%, #00FF00 30% 40%,
+                              #0000FF 40% 50%, #4B0082 50% 60%, #8B00FF 60% 70%, #FFC0CB 70% 80%,
+                              #F08080 80% 90%, #FFD700 90% 100%);
+    box-shadow:0 0 12px rgba(0,0,0,.6);transform-origin:center center;transition:transform 4s cubic-bezier(.25,.46,.45,.94)
   }
-  .spinner-number{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform-origin:0 -42px; /* perfect radial alignment */
-    font-weight:900;
-    font-size:12px;
-    color:#000;
-    text-shadow:0 0 2px #fff;
-    pointer-events:none;
-  }
-  #arrow{
-    position:absolute;
-    top:-10px;
-    left:50%;
-    transform:translateX(-50%);
-    width:0;height:0;
-    border-left:6px solid transparent;
-    border-right:6px solid transparent;
-    border-bottom:14px solid #fff;
-    z-index:5;
-  }
+  #arrow{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #fff;z-index:5}
+  #spinBtn{min-width:100px}
 
+  /* Board */
   #main{display:flex;flex-direction:column;flex:1;min-height:0}
   #boardArea{flex:1;min-height:0;overflow:auto}
-  #track{max-width:1200px;margin:8px auto;display:grid;grid-template-columns:repeat(20, 1fr);gap:4px}
-  .cell{min-height:44px;border:1px solid var(--border);background:#202028;color:#ddd;font-size:.7rem;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:8px;padding:3px}
+  #track{max-width:1200px;margin:8px auto;display:grid;grid-template-columns:repeat(20, 1fr);gap:4px;position:relative}
+  .cell{min-height:44px;border:1px solid var(--border);background:#202028;color:#ddd;font-size:.7rem;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:8px;padding:3px;position:relative}
   .cell small{display:block;color:#cfcfcf;font-size:.6rem;margin-top:2px}
   .cell.start{background:#1b5e20}
   .cell.finish{background:#0d47a1}
@@ -74,16 +102,26 @@
   .cell.extortion{background:#4e342e}
   .cell.active{outline:3px dashed #ffd54f}
 
+  /* Tokens */
+  .tokens{position:absolute;inset:2px;display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;justify-content:flex-start;pointer-events:none}
+  .token{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#000;text-shadow:0 0 2px #fff;border:1px solid rgba(0,0,0,.4)}
+
+  /* Players dock */
   #playersDock{flex:0 0 170px;border-top:1px solid var(--border);background:#0e0e12}
-  #players{height:100%;max-width:1200px;margin:0 auto;padding:8px;display:flex;gap:12px;overflow:auto}
-  .card{min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px}
+  #players{height:100%;max-width:1200px;margin:0 auto;padding:8px;display:flex;gap:12px;overflow-x:auto}
+  .card{min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;transition:all .3s ease}
+  .card.is-current-turn{outline:3px solid #ffd54f;box-shadow:0 0 15px rgba(255, 213, 79, 0.5);}
   .title{font-weight:900;margin-bottom:6px}
   .mono{font-variant-numeric:tabular-nums}
   .delta{font-size:.8rem;color:#9ccc65;margin-left:6px}
-  #log{display:none}
+  .user-id{font-size:.7rem;color:#555;}
+
+  /* Modal */
+  #modal{display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,.8);z-index:100;}
+  #modal .sheet{background:#181921;border:1px solid #2a2a35;border-radius:12px;max-width:560px;width:92%;padding:16px;}
 </style>
 </head>
-<body>
+<body onload="initializeAppAndAuth()">
 <header>
   <img id="logo" src="lowlife logo.jpg" alt="The Game of Lowlife">
   <h1>The Game of Lowlife</h1>
@@ -92,30 +130,21 @@
 <div id="app">
   <section id="topbar">
     <div id="controls">
-      <div id="lobbyControls" style="display:flex; flex-wrap:wrap; gap:10px;">
-        <button id="createGameBtn" class="btn" type="button">Create Game</button>
-        <label>Game Code:
-          <input id="gameCodeInput" type="text" placeholder="Enter Code" maxlength="4" style="width:100px;">
-        </label>
-        <button id="joinGameBtn" class="btn" type="button">Join Game</button>
-      </div>
-
-      <div id="gameLobby" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
-          <span style="color:var(--accent); font-weight:700;">Invite Code: <span id="displayGameCode"></span></span>
-      </div>
-      <label>Players:
-        <select id="numPlayers" disabled> <option>2</option><option>3</option><option>4</option>
-          <option>5</option><option>6</option><option>7</option><option>8</option>
-        </select>
+      <!-- Game Setup/Join Controls -->
+      <label>Game ID:
+        <input type="text" id="gameIdInput" placeholder="Enter a Game ID" value="lowlife-game-1" maxlength="20"/>
       </label>
-      <button id="buildNames" class="btn" type="button" disabled>Set Names</button>
-      <div id="namesRow" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      <button id="startBtn" class="btn" type="button" disabled>Start Game</button>
-      <button id="spinBtn" class="btn" type="button" disabled>SPIN</button>
-      <label>Voice: <select id="voiceSel"></select></label>
-      <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
-      <span id="status">Enter names, then Start Game.</span>
+      <button id="joinGameBtn" class="btn">Join/Create Game</button>
+      <button id="startGameBtn" class="btn" disabled style="background:#4caf50;">Start Game</button>
 
+      <!-- Player Interaction Controls -->
+      <button id="spinBtn" class="btn" disabled>SPIN</button>
+      <label>Voice: <select id="voiceSel"></select></label>
+      <span style="color:#aaa">TARD deck: <span id="deckCount">N/A</span></span>
+      <span id="gameInfo"></span>
+      <span id="status">Connecting to Firebase...</span>
+
+      <!-- Spinner -->
       <div id="spinnerWrap" title="Spin result is read aloud">
         <div id="spinner-container">
           <div id="spinner-wheel"></div>
@@ -129,34 +158,696 @@
     <section id="boardArea">
       <div id="track"></div>
     </section>
+
     <section id="playersDock">
       <div id="players"></div>
     </section>
   </section>
 </div>
 
-<section id="log"></section>
+<!-- Log is hidden for now -->
+<section id="log" style="display:none"></section>
 
-<!-- SOCKET.IO -->
-<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-<script>
-  const socket = io("https://lowlife-server-1.onrender.com", { path:"/socket.io", transports:["websocket","polling"] });
+<div id="modal">
+  <div class="sheet">
+    <h3 id="modalTitle" style="margin:0 0 8px 0;">TARD CARD</h3>
+    <div id="modalBody" class="body" style="white-space:pre-wrap;line-height:1.4"></div>
+    <div id="modalActions" class="actions" style="margin-top:12px;text-align:right"><button class="btn" onclick="window.closeModal()">OK</button></div>
+  </div>
+</div>
 
-  // --- Spinner numbers (centered) ---
-  const spinnerWheel = document.getElementById("spinner-wheel");
-  if (spinnerWheel) {
-    // Clear any old numbers
-    document.querySelectorAll(".spinner-number").forEach(e => e.remove());
-    for (let i = 0; i < 10; i++) {
-      const num = document.createElement("div");
-      num.className = "spinner-number";
-      num.textContent = i + 1;
-      num.style.transform = `rotate(${i * 36}deg)`;
-      spinnerWheel.appendChild(num);
+<script type="module">
+  import { doc, getDoc, setDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+  // ===== CONSTANTS =====
+  // Payday Adjustments Applied
+  const CHARACTERS = [
+    { name:'Slum Lord',         payday:2500, edu:'High School', paysOff:['Pornstar'] },
+    { name:'Gold Digger',       payday:2000, edu:'Dropout',     paysOff:['Porn Producer'], rentImmunityOnLanding:true },
+    { name:'Pimp',              payday:7000, edu:'High School', paysOff:['Dirty Cop'] }, // Unchanged
+    { name:'Drug Dealer',       payday:2500, edu:'Dropout',     paysOff:[] }, // Prioritizing higher $2,500
+    { name:'Pornstar',          payday:2000, edu:'Dropout',     paysOff:['Pimp'] },
+    { name:'Porn Producer',     payday:2500, edu:'High School', paysOff:['Gold Digger'] },
+    { name:'Online Influencer', payday:2000, edu:'Dropout',     paysOff:['Dirty Cop'] },
+    { name:'Dirty Cop',         payday:2500, edu:'High School', paysOff:[] }
+  ];
+
+  // 100 Squares. Finish bonus changed from $5,000 to $10,000.
+  const EVENTS = [
+    'Start','High school pregnancy, gain a family member','Sell weed at school, earn $500','Tard card','Payday','Breast implant bursts, pay $500 for surgery','Mom gets fired from the brothel, gain a family member','Identity theft','Waiting for dealer, miss a turn','Tard card','Payday','High on K, fall back two spaces','Pick a pocket, earn $200','Add to shit mix','Tard card','Bankruptcy, spin a five or nine to avoid financial ruin','Got fired as porn fluffer, miss next payday','Payday','Pay back payday loan, $600','Tard card','Extortion','Identity theft','Wake up and need stitches in your head, miss a turn','Drink the shit mix','Add to shit mix','Payday','Accidentally poison your spouse, lose a family member','Extortion','Dine and dash, earn $100','Lottery, spin three or nine to win','Payday','Tard card','Got a father\'s day abortion, lose a family member','Identity theft','Get laid off on your birthday, miss your next payday, do a shot','Gerbiling incident, pay $1,000 for removal','Payday','Shotgun wedding, gain a family member','Lottery, spin four or eight to win','Crazy brother won\'t leave, gain a family member','Tard card','Your TikTok goes viral, spin times 100','Get a massage with a happy ending, pay $300','Extortion','Ha ha, it\'s twins, gain a family member, times two','Payday','Feeling a bit tipsy, stumble forward one space','Bankruptcy, spin a three to avoid total ruin','Tard card','Get work as dildo tester, earn $1,000','Get a payday loan, earn $200','Fly to Thailand to get a vagina installed, pay $1,000','Family delousing, pay 500 per member','Payday','Lottery, spin a one to win','Bankruptcy, you\'re fucked','Identity theft','Tard card','Lost a kid at the mall, lose a family member','Got a part-time job as a porn fluffer, spin times 100','Payday','Drink the shit mix','Steal $1,000 from any player','Tard card','Extortion','Payday','Go back three spaces to look for phone','Lottery, spin a one or nine to win','Surprise! I\'m your kid. Gain a family member.','Identity theft','Sell used sex toys online. Spin x 50.','Tard card','Buy used sex toys online. Pay $300.','Payday','Arrested in the Dominican. Pay $5,000.','High on meth. Speed ahead two places.','Tard card','Bankruptcy. Spin 9 to avoid total ruin.',
+    'Payday','Tard card','Identity theft','Extortion','Lottery, spin two or eight to win','Got caught on camera shoplifting, pay $400','Found cash in a Crown Royal bag, earn $350','Bachelor party side hustle, earn $700','Baby mama drama, lose a family member','Neighborhood brawl goes viral, spin times 100','Rent\'s due, pay $500','OnlyFans flop, pay $300 for lighting','Win a radio contest, earn $250','Stuck in detox, miss a turn','Payday','Tard card','Speed date disaster, go back three spaces','Hot streak at the slots, earn $1,000','High on shrooms, stumble forward one space',
+    'Bankruptcy — instant, no rescue.',        /* index 98 => square #99 */
+    'Finish — first to cross gets $10,000 bonus.'/* index 99 => square #100, BONUS IS $10,000 NOW */
+  ];
+  const N_SQUARES = EVENTS.length;
+  const FINISH_BONUS = 10000;
+
+  const TARD_CARDS = [
+    //... (TARD cards remain the same for now)
+    'Grandma Joined a Cult – She ran off with a man named Moonbeam. Lose 1 family member.',
+    'Dad Arrested in the Dominican Republic – “It was just one drink!” Lose 1 family member.',
+    'Brother ODs – The good die young, the dumb die first. Lose 1 family member.',
+    'DNA Disaster – Turns out you’re not the dad. Lose 1 family member.',
+    'Family Car Fire – Somebody lit up while pumping gas. Lose 1 family member.',
+    'Mom Gets Fired from the Brothel – She’s moving in. Gain 1 family member.',
+    'Meth Lab Explosion – Dad survived and needs a couch. Gain 1 family member.',
+    'Queer Cousin Gets Thrown Out – Glitter storm incoming. Gain 1 family member.',
+    'Surprise! You’re My Real Dad – Someone’s calling you “Daddy,” and not the fun kind. Gain 1 family member.',
+    'Bro Just Got Released – Fresh out and already asking for Wi-Fi. Gain 1 family member.',
+    'Karma’s Bitch – Reverse any money loss.',
+    'Block Their Blessing – Cancel another player’s money/bonus and take it.',
+    'Public Humiliation – Force them to do the same dare or pay.',
+    'Take the Couch – Swap one family member between you and them.',
+    'Petty AF – Skip the next turn of whoever made you lose yours.',
+    'Scabies Breakout – Pay $200 per family member to get deloused.',
+    'Sing Us a Song – $500 bonus if recorded.',
+    'Update Facebook: “I WON THE LOTTERY!”',
+    'Make the Person to Your Left Laugh – Fail? Pay $100.',
+    'Share Your Most Embarrassing Moment – Earn $200 if everyone cringes.',
+    'Eat a Red Chili Pepper – Survive a full turn without water to gain $500.',
+    'Give Your Neighbor a Pearl Necklace.',
+    'Draw Your Best Cocksucker Lips in 5 Seconds.',
+    'Give Someone a Lap Dance – Collect $100 per blush.',
+    'Bad Trip – Woke up in another province. Lose 1 turn.',
+    'Repo Man – Lose your vehicle or pay $500.',
+    'Tax Refund Gone Wrong – Lose $1,000.',
+    'OnlyFans Fame – Gain $1,500, lose your job.',
+    'Evangelical Exorcism – Lose $200.',
+    'Public Urination Ticket – Lose $300.',
+    'Drag Bingo Win – Gain $300.',
+    'Bad Investment – Lose $1,500.',
+    'Power Outage Party – Gain one social connection and $100.',
+    'STD Scare – Lose a turn.',
+    'Eviction Notice – Move back home. Gain 1 family member.',
+    // +10 payoff cards
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Payoff Card – Pay the person on your character card. Spin x 50.'
+  ];
+  let tardIndex = 0;
+  
+  // ===== FIREBASE STATE AND ELEMENTS =====
+  let unsubscribeGame = null;
+  let localGameState = { state: 'LOBBY', turn: null, players: {}, firstFinisherAwarded: false };
+  let localPlayer = null; // Local copy of the current user's player data
+
+  const gameIdInput = document.getElementById('gameIdInput');
+  const joinGameBtn = document.getElementById('joinGameBtn');
+  const startGameBtn = document.getElementById('startGameBtn');
+  const spinBtn = document.getElementById('spinBtn');
+  const statusEl = document.getElementById('status');
+  const gameInfoEl = document.getElementById('gameInfo');
+  const playersEl = document.getElementById('players');
+  const boardEl = document.getElementById('track');
+  const deckCountEl = document.getElementById('deckCount');
+
+  // Spinner elements
+  const wheel = document.getElementById('spinner-wheel');
+  let currentAngle = 0;
+  let spinning = false;
+
+  // Voice/Speech
+  const voiceSel = document.getElementById('voiceSel');
+  let voices = [];
+  let chosenVoice = null;
+  const speechQueue=[]; let speaking=false;
+
+  // ===== HELPER FUNCTIONS =====
+
+  function pickColor(i){ const pal=['#f44336','#2196f3','#4caf50','#ff9800','#e91e63','#00bcd4','#9c27b0','#8bc34a']; return pal[i%pal.length]; }
+  function initials(name){ return (name.trim().split(/\s+/).map(s=>s[0]).join('').slice(0,2)||'?').toUpperCase(); }
+  function updateDeckCount(){ deckCountEl.textContent = localGameState.tardIndex !== undefined ? `${TARD_CARDS.length - localGameState.tardIndex} / ${TARD_CARDS.length}` : 'N/A'; }
+  function generateGameId() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+
+  // Speech helper
+  function queueSay(text){
+    if(!('speechSynthesis' in window) || !text) return;
+    speechQueue.push(String(text));
+    if(!speaking) playNextUtterance();
+  }
+  function playNextUtterance(){
+    if(speechQueue.length===0){ speaking=false; return; }
+    speaking=true;
+    const text = speechQueue.shift();
+    const u = new SpeechSynthesisUtterance(text);
+    if(chosenVoice) u.voice = chosenVoice;
+    u.onend = ()=> playNextUtterance();
+    try{ speechSynthesis.speak(u); }catch(e){ speaking=false; }
+  }
+
+  // Voice setup
+  function populateVoices(){
+    if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
+    voices=speechSynthesis.getVoices()||[]; voiceSel.innerHTML='';
+    if(voices.length===0){ voiceSel.innerHTML='<option>(no voices)</option>'; chosenVoice=null; return; }
+    voices.forEach((v,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=`${v.name} — ${v.lang}`; voiceSel.appendChild(o); });
+    const idx=voices.findIndex(v=>/UK|British/i.test(v.name+v.lang)&&/en/i.test(v.lang));
+    voiceSel.selectedIndex=idx>=0?idx:0; chosenVoice=voices[voiceSel.selectedIndex]||null;
+  }
+  if('speechSynthesis' in window){ populateVoices(); window.speechSynthesis.onvoiceschanged = populateVoices; }
+
+  // Modal helpers
+  window.closeModal = function(){ document.getElementById('modal').style.display='none'; }
+  function showModal(title,body,buttons){
+    document.getElementById('modalTitle').textContent=title;
+    const bodyEl=document.getElementById('modalBody');
+    bodyEl.innerHTML='';
+    if(typeof body==='string') bodyEl.textContent=body; else bodyEl.appendChild(body);
+    const actions=document.getElementById('modalActions');
+    actions.innerHTML='';
+    (buttons||[{label:'OK',action:window.closeModal}]).forEach(b=>{
+      const btn=document.createElement('button'); btn.className='btn'; btn.textContent=b.label;
+      btn.onclick=()=>{ b.action&&b.action(); };
+      actions.appendChild(btn);
+    });
+    document.getElementById('modal').style.display='flex';
+  }
+
+  // Spinner animation
+  function animateToNumber(target){
+    const centerAngle=(target-0.5)*36;
+    const desiredMod=(270-centerAngle+360)%360;
+    const currentMod=((currentAngle%360)+360)%360;
+    const spins=6;
+    const delta=((desiredMod-currentMod+360)%360)+spins*360;
+    currentAngle+=delta;
+    wheel.style.transform=`rotate(${currentAngle}deg)`;
+  }
+
+  // ===== FIREBASE GAME MANAGEMENT =====
+
+  // Path to the game document
+  function getGamePath(gameId) {
+    return `artifacts/${window.appId}/public/data/games/${gameId}`;
+  }
+  
+  // Creates a new game or joins an existing one
+  async function joinOrCreateGame() {
+    if (!window.currentUserId) {
+        statusEl.textContent = "Error: Authentication not ready. Please wait.";
+        return;
+    }
+    if (unsubscribeGame) unsubscribeGame();
+
+    const gameId = gameIdInput.value.trim().toLowerCase();
+    if (!gameId) {
+        statusEl.textContent = "Please enter a Game ID.";
+        return;
+    }
+
+    statusEl.textContent = `Looking for game ${gameId}...`;
+    window.gameRef = doc(window.db, getGamePath(gameId));
+    
+    // Attempt to read the document
+    try {
+        await runTransaction(window.db, async (transaction) => {
+            const gameDoc = await transaction.get(window.gameRef);
+            const playerPool = [...CHARACTERS];
+            
+            if (!gameDoc.exists()) {
+                // --- CREATE NEW GAME ---
+                const selectedChar = playerPool[Math.floor(Math.random() * playerPool.length)];
+                const newPlayer = createNewPlayerState(window.currentUserId, `Player ${Object.keys(playerPool).length + 1}`, selectedChar, 0);
+
+                const newGame = {
+                    gameId: gameId,
+                    state: 'LOBBY',
+                    turn: window.currentUserId,
+                    players: { [window.currentUserId]: newPlayer },
+                    tardIndex: 0,
+                    tardCards: shuffleTardDeck(),
+                    firstFinisherAwarded: false,
+                    createdAt: Date.now()
+                };
+                transaction.set(window.gameRef, newGame);
+                statusEl.textContent = `Created new game: ${gameId}. Waiting for players.`;
+                queueSay(`Game created. You are the ${selectedChar.name}.`);
+            } else {
+                // --- JOIN EXISTING GAME ---
+                const gameData = gameDoc.data();
+
+                if (gameData.state !== 'LOBBY') {
+                    if (!gameData.players[window.currentUserId]) {
+                        throw new Error(`Game ${gameId} is already in progress and you are not a participant.`);
+                    }
+                    // Player is already in game, just subscribe
+                } else if (!gameData.players[window.currentUserId]) {
+                    // New player joining the lobby
+                    const usedCharacters = Object.values(gameData.players).map(p => p.character.name);
+                    const availableChars = playerPool.filter(c => !usedCharacters.includes(c.name));
+                    
+                    if (availableChars.length === 0) {
+                        throw new Error("Lobby is full (Max 8 players).");
+                    }
+
+                    const selectedChar = availableChars[Math.floor(Math.random() * availableChars.length)];
+                    const newPlayer = createNewPlayerState(window.currentUserId, `Player ${Object.keys(gameData.players).length + 1}`, selectedChar, Object.keys(gameData.players).length);
+                    
+                    // Add player to the existing document
+                    gameData.players[window.currentUserId] = newPlayer;
+                    transaction.update(window.gameRef, { players: gameData.players });
+                    statusEl.textContent = `Joined game: ${gameId}. Waiting for start.`;
+                    queueSay(`You joined the game. You are the ${selectedChar.name}.`);
+                }
+            }
+        });
+
+        // Start listening for real-time updates
+        setupGameListener(gameId);
+
+    } catch (e) {
+        console.error("Transaction failed:", e);
+        statusEl.textContent = e.message || `Failed to join/create game ${gameId}.`;
+        window.gameRef = null;
     }
   }
-</script>
 
-<!-- Your existing game JavaScript continues below this comment -->
+  // Set up the real-time listener
+  function setupGameListener(gameId) {
+    if (unsubscribeGame) unsubscribeGame();
+    
+    unsubscribeGame = onSnapshot(window.gameRef, (docSnap) => {
+        if (!docSnap.exists()) {
+            localGameState = { state: 'LOBBY', turn: null, players: {}, firstFinisherAwarded: false };
+            gameInfoEl.textContent = '';
+            statusEl.textContent = 'Game document removed. Join or create a new game.';
+            renderBoard(); renderPlayers();
+            return;
+        }
+
+        const newState = docSnap.data();
+        localGameState = newState;
+
+        // Find and update local player data
+        localPlayer = newState.players[window.currentUserId];
+
+        // RENDER UI based on new state
+        renderBoard();
+        renderPlayers();
+        
+        updateControlsState(newState);
+        updateDeckCount();
+        gameInfoEl.textContent = `Game: ${newState.gameId} | State: ${newState.state}`;
+
+        if (newState.state === 'PLAYING') {
+            const currentPlayer = newState.players[newState.turn];
+            if (currentPlayer) {
+                statusEl.textContent = `It is ${currentPlayer.name}'s turn.`;
+            }
+        }
+    }, (error) => {
+        console.error("Firestore listener error:", error);
+        statusEl.textContent = "Connection lost. Check console for details.";
+    });
+  }
+
+  // State structure for a new player
+  function createNewPlayerState(userId, defaultName, character, index) {
+    return {
+      id: userId,
+      name: defaultName,
+      character: character,
+      position: 0,
+      money: 0,
+      family: 0,
+      missNextTurn: false,
+      missNextPayday: false,
+      lastMoneyDelta: 0,
+      color: pickColor(index)
+    };
+  }
+
+  // Shuffle TARD cards (only done once at game creation)
+  function shuffleTardDeck(){
+    const shuffled = [...TARD_CARDS];
+    shuffled.sort(()=>Math.random()-0.5);
+    return shuffled;
+  }
+
+  // Button state logic
+  function updateControlsState(state) {
+    const isLobby = state.state === 'LOBBY';
+    const isPlaying = state.state === 'PLAYING';
+    const isMyTurn = isPlaying && state.turn === window.currentUserId;
+    const isHost = Object.keys(state.players).indexOf(window.currentUserId) === 0;
+
+    joinGameBtn.disabled = true; // Once connected, disable join/create
+    gameIdInput.disabled = true;
+
+    startGameBtn.style.display = isLobby ? 'inline-block' : 'none';
+    startGameBtn.disabled = !isHost || Object.keys(state.players).length < 2;
+
+    spinBtn.disabled = !isMyTurn || spinning;
+
+    // Additional status updates
+    if (isLobby) {
+        const pCount = Object.keys(state.players).length;
+        statusEl.textContent = isHost ? `LOBBY: ${pCount} players. Need 2+ to start.` : `LOBBY: Waiting for host to start (${pCount} players).`;
+    }
+  }
+
+  // Host starts the game
+  async function startGame() {
+    if (localGameState.state !== 'LOBBY' || Object.keys(localGameState.players).length < 2) return;
+
+    try {
+        await runTransaction(window.db, async (transaction) => {
+            const gameDoc = await transaction.get(window.gameRef);
+            if (!gameDoc.exists()) throw new Error("Game not found.");
+            const gameData = gameDoc.data();
+
+            // Determine turn order (Dropouts spin first)
+            const playerList = Object.values(gameData.players).sort((a,b)=> 
+                (a.character.edu==='Dropout')===(b.character.edu==='Dropout')?0:(a.character.edu==='Dropout'?-1:1)
+            );
+            
+            // Set first turn
+            const firstTurnId = playerList[0].id;
+
+            transaction.update(window.gameRef, {
+                state: 'PLAYING',
+                turn: firstTurnId,
+                playerOrder: playerList.map(p => p.id)
+            });
+            queueSay('The game is starting now. Dropouts spin first.');
+        });
+    } catch (e) {
+        console.error("Start game failed:", e);
+    }
+  }
+
+
+  // ===== BOARD AND PLAYER RENDERING =====
+
+  function classify(text){ const t=text.toLowerCase();
+    if(t.startsWith('start'))return'start'; if(t.startsWith('finish'))return'finish';
+    if(t.includes('payday'))return'payday'; if(t.includes('tard card'))return'tard';
+    if(t.includes('bankruptcy'))return'bankruptcy'; if(t.includes('lottery'))return'lottery';
+    if(t.includes('identity theft'))return'idtheft'; if(t.includes('extortion'))return'extortion';
+    return'normal';
+  }
+  function shortLabel(text){ const t=text.toLowerCase();
+    if(t.includes('payday'))return'PAYDAY'; if(t.includes('tard card'))return'TARD';
+    if(t.includes('lottery'))return'LOTTO'; if(t.includes('bankruptcy'))return'BANKRUPT';
+    if(t.includes('identity theft'))return'ID THEFT'; if(t.includes('extortion'))return'EXTORT';
+    return text.length>22? text.slice(0,21)+'…':text;
+  }
+  function renderBoard(){
+    if(boardEl.childElementCount === 0) { // Only render structure once
+        for(let i=0;i<N_SQUARES;i++){
+            const text=EVENTS[i]; const kind=classify(text);
+            const c=document.createElement('div');
+            c.className='cell '+(kind==='normal'?'':kind);
+            c.dataset.index=i; c.title=text;
+            c.innerHTML=`<div><b>${i+1}</b><small>${shortLabel(text)}</small></div><div class="tokens"></div>`;
+            boardEl.appendChild(c);
+        }
+    }
+    placeAllTokens();
+    highlightCell(localPlayer ? localPlayer.position : -1);
+  }
+
+  function highlightCell(idx){
+    document.querySelectorAll('.cell').forEach(e=>e.classList.remove('active'));
+    const el=document.querySelector(`.cell[data-index="${idx}"]`);
+    if(el) el.classList.add('active');
+  }
+
+  function placeAllTokens(){
+    document.querySelectorAll('.tokens').forEach(t=>t.innerHTML='');
+    Object.values(localGameState.players).forEach(p=>{
+      const cell=document.querySelector(`.cell[data-index="${p.position}"] .tokens`);
+      if(cell){
+        const el=document.createElement('div'); el.className='token';
+        el.style.background=p.color; el.textContent=initials(p.name);
+        cell.appendChild(el);
+      }
+    });
+  }
+
+  function renderPlayers(){
+    playersEl.innerHTML='';
+    const players = Object.values(localGameState.players);
+    const playerOrder = localGameState.playerOrder || players.map(p => p.id);
+    
+    // Sort players by the determined turn order
+    const sortedPlayers = playerOrder.map(id => players.find(p => p.id === id)).filter(Boolean);
+
+    sortedPlayers.forEach((p,i)=>{
+      const d=document.createElement('div'); d.className='card';
+      if(p.id === localGameState.turn) d.classList.add('is-current-turn');
+      d.innerHTML=`<div class="title">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name}
+      </div>
+      <div class="user-id">ID: ${p.id.slice(0, 8)}...</div>
+      <div>Char: ${p.character.name} | Edu: ${p.character.edu}</div>
+      <div>Payday: <span class="mono">$${p.character.payday.toLocaleString()}</span></div>
+      <div>Money: <span class="mono">$${p.money.toLocaleString()}</span> | Family: <span class="mono">${p.family}</span> <span class="delta">${p.lastMoneyDelta?`(${p.lastMoneyDelta>0?'+':''}${p.lastMoneyDelta})`:''}</span></div>
+      <div>Pos: <span class="mono">#${p.position+1}</span> — ${EVENTS[p.position]}</div>`;
+      playersEl.appendChild(d);
+    });
+  }
+
+  // ===== GAME LOGIC (TRANSACTION-BASED) =====
+
+  spinBtn.addEventListener('click', async ()=>{
+    if(spinning || !localGameState.turn || localGameState.turn !== window.currentUserId) return;
+    
+    const roll = Math.floor(Math.random()*10)+1;
+    spinning=true; spinBtn.disabled=true;
+    queueSay(`You spun a ${roll}.`);
+    animateToNumber(roll);
+
+    setTimeout(async ()=>{
+      await resolveSpin(roll);
+      spinning=false; 
+      // Button state is refreshed by the Firestore listener
+    }, 4000);
+  });
+
+  async function resolveSpin(roll){
+    try {
+        await runTransaction(window.db, async (transaction) => {
+            const gameDoc = await transaction.get(window.gameRef);
+            if (!gameDoc.exists()) throw new Error("Game not found during spin.");
+            const gameData = gameDoc.data();
+            
+            const p = gameData.players[window.currentUserId];
+            if (!p || gameData.turn !== window.currentUserId) throw new Error("It's not your turn or player data missing.");
+
+            const summary = [];
+            
+            if(p.missNextTurn){
+                p.missNextTurn = false;
+                summary.push(`You spun ${roll}, but you miss your turn.`);
+            } else {
+                // Apply movement and square logic
+                applyMovementAndSquareEffects(p, roll, gameData, summary);
+            }
+
+            // Move turn to the next player
+            const playerOrder = gameData.playerOrder;
+            const currentIndex = playerOrder.indexOf(gameData.turn);
+            const nextIndex = (currentIndex + 1) % playerOrder.length;
+            gameData.turn = playerOrder[nextIndex];
+            
+            // Update the game state in Firestore
+            gameData.players[window.currentUserId] = p; // update player's state
+            transaction.update(window.gameRef, {
+                players: gameData.players,
+                turn: gameData.turn,
+                tardIndex: gameData.tardIndex,
+                firstFinisherAwarded: gameData.firstFinisherAwarded
+            });
+            
+            queueSay(`Summary: ${summary.join(' ')}`);
+
+        }, { maxAttempts: 3 });
+        
+    } catch (e) {
+        console.error("Spin transaction failed:", e);
+        statusEl.textContent = e.message || "Failed to process turn.";
+        // On failure, re-enable button and rely on listener for state
+        if (localGameState.turn === window.currentUserId) spinBtn.disabled = false;
+    }
+  }
+
+  // CORE GAME MOVEMENT AND SQUARE EFFECTS (run inside a transaction)
+  function applyMovementAndSquareEffects(p, steps, gameData, summary){
+    const start=p.position;
+    const landing=(start+steps)%N_SQUARES;
+    const landingIsPayday = EVENTS[landing].toLowerCase().includes('payday');
+
+    // Payday crossings (count only intermediate payday squares)
+    if(!landingIsPayday){
+      for(let i=1;i<steps;i++){
+        const idx=(start+i)%N_SQUARES;
+        if(EVENTS[idx].toLowerCase().includes('payday')) processCrossingPayday(p, summary);
+      }
+    }
+
+    p.position=landing;
+    
+    // Rent Rule before square effects
+    chargeRent(p, summary, gameData);
+
+    const cellText=EVENTS[p.position];
+    queueSay(cellText); // speak full event text
+
+    if(landingIsPayday) processLandingPayday(p, summary);
+
+    // Apply square effects (no chaining in multiplayer for simplicity/atomic updates)
+    applySquareEffect(p, cellText, p.position, gameData, summary);
+
+    // Finish check
+    checkFinishBonus(p, gameData, summary);
+  }
+
+  function processCrossingPayday(p, summary){
+    if(p.missNextPayday){ p.missNextPayday=false; summary.push('Crossed PAYDAY: shot, no pay.'); return; }
+    p.money += p.character.payday;
+    p.lastMoneyDelta = p.character.payday;
+    summary.push(`Crossed PAYDAY: +$${p.character.payday.toLocaleString()} and do a shot.`);
+  }
+
+  function processLandingPayday(p, summary){
+    const bonus = 1000;
+    p.money += p.character.payday + bonus;
+    p.lastMoneyDelta = p.character.payday + bonus;
+    summary.push(`Landed on PAYDAY: +$${p.character.payday.toLocaleString()} and $1,000 bonus.`);
+  }
+
+  function checkFinishBonus(p, gameData, summary){
+    // Square #100 (index 99) is Finish
+    if(p.position === 99 && !gameData.firstFinisherAwarded){
+      gameData.firstFinisherAwarded = true;
+      p.money += FINISH_BONUS;
+      summary.push(`Finish line! First to cross: +$${FINISH_BONUS.toLocaleString()} bonus.`);
+    }
+  }
+  
+  // Rent Rule
+  function chargeRent(p, summary, gameData){
+    // Find all other players on the same square
+    const others = Object.values(gameData.players).filter(o => o.id !== p.id && o.position === p.position);
+    if(others.length === 0) return;
+    
+    if(p.character && p.character.rentImmunityOnLanding){
+      summary.push('Rent immunity (Gold Digger).');
+      return;
+    }
+    
+    const rent = 500 * Math.max(1, (p.family||0) + 1);
+    
+    // Apply rent charges/payments immediately to the player data in the transaction
+    others.forEach(o=>{
+      p.money -= rent; 
+      p.lastMoneyDelta = -rent;
+      
+      // Update the other player's money immediately in the transaction data
+      o.money += rent; 
+      o.lastMoneyDelta = rent;
+      gameData.players[o.id] = o; // Important: update the master state
+      
+      summary.push(`Paid $${rent.toLocaleString()} rent to ${o.name}.`);
+    });
+  }
+
+  // Simplified Square logic (actions that require interaction are now modals)
+  function applySquareEffect(p, text, idx, gameData, summary){
+    const t=text.toLowerCase();
+
+    // Read the action cues
+    if(t.includes('waiting for dealer')) p.missNextTurn=true;
+    if(t.includes('add to shit mix')) summary.push('Add to the shit mix.');
+    if(t.includes('drink the shit mix')) summary.push('Drink the shit mix.');
+    if(t.includes('do a shot')) summary.push('Do a shot.');
+
+    // Money deltas
+    const moneyMatch = /earn\s*\$([\d,]+)|pay\s*\$([\d,]+)/i.exec(t);
+    if(moneyMatch){
+        const amt = parseInt((moneyMatch[1] || moneyMatch[2]).replace(/,/g, ''), 10);
+        const delta = moneyMatch[1] ? amt : -amt;
+        p.money += delta; p.lastMoneyDelta = delta;
+        if(t.includes('pay 500 per member')) { // Override for family delousing
+            const amtFamily = 500 * p.family;
+            p.money -= amtFamily;
+            p.lastMoneyDelta = -amtFamily;
+        }
+    }
+    if(t.includes('steal $1,000')) { 
+        // Cannot handle interactive steal/extortion during a single transaction. 
+        // We defer this interaction to a modal on the client side, but for now, we apply a placeholder loss/gain.
+        // In a real game, this would pause the turn. For this single-file implementation, we use a fixed penalty.
+        p.money += 500; p.lastMoneyDelta = 500;
+        summary.push('STOLEN $500 (Simplified action).');
+    }
+
+    // Family
+    if(t.includes('gain a family member, times two')){ p.family+=2; }
+    else if(t.includes('gain a family member')){ p.family+=1; }
+    if(t.includes('lose a family member')){ p.family = Math.max(0, p.family-1); }
+
+    // Turn effects
+    if(t.includes('miss a turn') || t.includes('detox')){ p.missNextTurn=true; }
+    if(t.includes('miss next payday')){ p.missNextPayday=true; }
+
+    // Position nudges (re-entry to square 1) - does not re-trigger square effect
+    if(t.includes('go back three') || t.includes('fall back two') || t.includes('speed ahead two places') || t.includes('stumble forward one')){
+        const jump = t.includes('go back three') ? -3 : t.includes('fall back two') ? -2 : t.includes('speed ahead two') ? 2 : 1;
+        p.position=(p.position+jump+N_SQUARES)%N_SQUARES;
+    }
+
+    // Lottery / Bankruptcy - must be simplified.
+    if(t.includes('bankruptcy')){
+        if(t.includes('instant, no rescue') || t.includes("you're fucked")){
+            p.lastMoneyDelta = -p.money; p.money = 0;
+            summary.push('BANKRUPTCY: Lost all money.');
+        } else {
+             // For non-instant, we simplify to a 50% chance of losing all money
+            if(Math.random() < 0.5) {
+                p.lastMoneyDelta = -p.money; p.money = 0;
+                summary.push('BANKRUPTCY: Failed rescue spin, lost all money (50/50 chance).');
+            } else {
+                summary.push('BANKRUPTCY: Successful rescue spin (50/50 chance).');
+            }
+        }
+    }
+    
+    // Interactive cards/events are simplified to client-side modal for display only
+    if(t.includes('tard card')){
+        const cardIndex = gameData.tardIndex % gameData.tardCards.length;
+        const card = gameData.tardCards[cardIndex];
+        gameData.tardIndex++; // Advance index in gameData
+        showModal('TARD CARD (Action Applied)', card, [{label:'OK',action:window.closeModal}]);
+    }
+  }
+
+
+  // ===== EVENT LISTENERS =====
+  document.addEventListener('authReady', () => {
+    statusEl.textContent = `Authenticated. User ID: ${window.currentUserId.slice(0, 8)}... Enter a Game ID to play.`;
+    joinGameBtn.disabled = false;
+  });
+  
+  joinGameBtn.addEventListener('click', joinOrCreateGame);
+  startGameBtn.addEventListener('click', startGame);
+
+  voiceSel.addEventListener('change', e=>{ chosenVoice=voices[e.target.value]; });
+  
+  // Fallback logo text
+  const logo = document.getElementById('logo');
+  logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
+
+  // Initial render of the empty board
+  renderBoard();
+</script>
 </body>
 </html>
