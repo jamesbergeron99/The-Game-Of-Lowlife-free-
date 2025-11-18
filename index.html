@@ -1,380 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>The Game of LowLife — Fixed Build (No Animations)</title>
-  <style>
-    :root {
-      --panel: 380px;
-      --bg:#0e0f13;
-      --ink:#f2f3f7;
-      --accent:#ffcc33;
-      --accent2:#ff3366;
-    }
-    * { box-sizing:border-box; }
-    html, body {
-      height:100%;
-      margin:0;
-      background:var(--bg);
-      color:var(--ink);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans";
-    }
-    #app {
-      display:grid;
-      grid-template-columns: 1fr var(--panel);
-      height:100%;
-    }
-    #board-wrap {
-      position:relative;
-      overflow:hidden;
-    }
-    #board {
-      position:absolute;
-      inset:0;
-      background-image:url('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZ
-WFgAAANkAAAAIADz0wAUBB9bC5/////bAtsQmVlZCwkO25wfooNCkxNTU1NTk5OTk5OTk5OTk5OTk5OTk5OTk5
-OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5
-OTk5OTk5Of/bAtsQmVlZCwkO25wfooNCkxNTU1NTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5
-OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5Of/CABEIAJEA
-xQMBIgACEQEDEQH/xAAdAAEAAgIDAQEAAAAAAAAAAAAABgcEBQgDAgEJ/8QAUxAAAQMCAwMFBQYDBQQFBgcA
-AQIDBQAEERIhBhMxQVFhBwgUIjKRoRUjUnKxwQcVYpKh8BY0NENjgpLxFiZDVHNURFRzgqPh8v/EABoBAQAC
-AwEAAAAAAAAAAAAAAAMEBQECBgj/xAA+EQEAAQIDBQcFAwIFBAMAAAABAgMEEQUSITFBUSJhcYGRFDKhscHR
-8AYyQhRC8SNSYoLxFkNDU5L/2gAMAwEAAhEDEQA/AO7iIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiIC
-IiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAitTp4tNO6LqV2dcW3a2juF1FwsCbi3bU9ttbjOt3Y
-nHjn7nX8R1WwLtF2fw1e7XLN9pc5utN4PhQvvW2vl1Xq7a31u8mPTXgrQqZbVqN3qStLZrf9p7R5JWyVa4VI
-jZ5jYI27MY+4N1x6jO2k1SztYd9oJ5r7Q1kaK64t/wBHbG7Xnj48NNRLl3NPctdre0a6p3YZru9vbcaJ5/wD
-Xb8ihw0ttoLS3t3nW5bW4r2ttHbW9y5J9l8I6yq3bT7c3aS5e9aPqvZ3ad1nW+6uX3J9z6HTnbF1rkpt9u2a7
-1u2rTbbS8b7Z7Sb3ps+uPxGg9o91TVd07tLdM5bW8bus2mni3Cqe++8+bV9d4tG8+k1H3FW1qro6sttFXUW0N
-rdZbHc4t7rj3ztk8Fhh+6X/AK16fiqF9qbS3t7X9f+qmtFjq+3u7nW3u+y0v8A6rW9rf1tt5+Hf4t72lZbVbS
-…
-…Wz7VfVXz0tn2q+qqKlNbGlFb6Wz7VfVXz0tn2q+qqKlNbGlFb6Wz7VfVXz0tn2q+qqKlNbGlFb6Wz7VfVXz
-0tn2q+qqKlNbGlFb6Wz7VfVXz0tn2q+qqKlNbGlFb6Wz7VfVXz0tn2q+qqKlNbGlFb6'); 
-      background-size:cover;
-      background-position:center;
-      filter:brightness(1.0);
-    }
-    /* token */
-    #player-token {
-      position:absolute;
-      width:18px;
-      height:18px;
-      border-radius:50%;
-      background:var(--accent2);
-      border:2px solid #000;
-      box-shadow:0 0 8px rgba(0,0,0,0.7);
-      transform:translate(-50%, -50%);
-      transition:transform 0.25s ease;
-      pointer-events:none;
-    }
-    /* Right panel */
-    #panel {
-      border-left:1px solid rgba(255,255,255,0.08);
-      padding:14px 16px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      background: radial-gradient(circle at top, #232532, #090a0e);
-    }
-    h1 {
-      margin:0;
-      font-size:20px;
-      letter-spacing:0.08em;
-      text-transform:uppercase;
-    }
-    .subtitle {
-      font-size:12px;
-      opacity:0.7;
-    }
-    label {
-      font-size:12px;
-      opacity:0.9;
-      display:block;
-      margin-bottom:4px;
-    }
-    input, button {
-      font-family:inherit;
-      font-size:14px;
-    }
-    input {
-      background:#181921;
-      border:1px solid rgba(255,255,255,0.2);
-      border-radius:999px;
-      color:var(--ink);
-      padding:6px 10px;
-      width:100%;
-    }
-    button {
-      border:none;
-      border-radius:999px;
-      padding:7px 13px;
-      cursor:pointer;
-      background:linear-gradient(135deg, #ffcc33, #ff7a18);
-      color:#111;
-      font-weight:600;
-      text-transform:uppercase;
-      letter-spacing:0.06em;
-    }
-    button.secondary {
-      background:#252736;
-      color:var(--ink);
-      border:1px solid rgba(255,255,255,0.15);
-    }
-    button:disabled {
-      opacity:0.4;
-      cursor:not-allowed;
-    }
-    .row {
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-    .pill {
-      background:#181921;
-      border-radius:999px;
-      padding:4px 8px;
-      font-size:11px;
-      display:inline-flex;
-      align-items:center;
-      gap:4px;
-      opacity:0.85;
-    }
-    .pill strong {
-      font-weight:600;
-    }
-    #status-line {
-      font-size:12px;
-      min-height:16px;
-      opacity:0.9;
-    }
-    #spinner-row {
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-    #roll-value {
-      font-size:26px;
-      font-weight:700;
-      width:40px;
-      text-align:center;
-    }
-    #logs {
-      flex:1;
-      min-height:60px;
-      background:#0f1017;
-      border-radius:10px;
-      padding:8px;
-      overflow-y:auto;
-      font-size:11px;
-      border:1px solid rgba(255,255,255,0.08);
-    }
-    .log-line span.roll {
-      color:var(--accent);
-      font-weight:600;
-    }
-    .log-line span.square {
-      color:#8bc34a;
-    }
-    small { font-size:10px; opacity:0.7; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Game of Lowlife</title>
+<style>
+  :root{--bg:#0b0b0e;--ink:#f5f5f7;--muted:#b7b7c2;--accent:#ffd54f;--border:#2a2a35;--card:#15161d}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui, Arial, sans-serif;display:flex;flex-direction:column;min-height:100vh}
+
+  header{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);background:#111}
+  header img{max-height:72px;display:block}
+  header h1{margin:0;font-weight:900;letter-spacing:1px;display:none;color:var(--accent)}
+
+  #app{display:flex;flex-direction:column;flex:1;min-height:0}
+  #topbar{flex:0 0 auto;position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
+  #controls{max-width:1200px;margin:0 auto;padding:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .btn{background:#e53935;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  input,select{background:#1b1b22;border:1px solid var(--border);color:#fff;border-radius:8px;padding:8px}
+  label{color:var(--muted);font-size:.9rem}
+  #status{color:var(--accent)}
+
+  /* --- SPINNER FIX --- */
+  #spinnerWrap{display:flex;align-items:center;gap:8px;margin-left:auto}
+  #spinner-container{position:relative;width:100px;height:100px}
+  #spinner-wheel{position:relative;width:100%;height:100%;border-radius:50%;
+    background:conic-gradient(
+      #FF0000 0% 10%, #FF7F00 10% 20%, #FFFF00 20% 30%, #00FF00 30% 40%,
+      #0000FF 40% 50%, #4B0082 50% 60%, #8B00FF 60% 70%, #FFC0CB 70% 80%,
+      #F08080 80% 90%, #FFD700 90% 100%
+    );
+    box-shadow:0 0 12px rgba(0,0,0,0.6);
+    transform-origin:center center;
+    transition:transform 4s cubic-bezier(.25,.46,.45,.94);
+  }
+  .spinner-number{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform-origin:0 -42px; /* perfect radial alignment */
+    font-weight:900;
+    font-size:12px;
+    color:#000;
+    text-shadow:0 0 2px #fff;
+    pointer-events:none;
+  }
+  #arrow{
+    position:absolute;
+    top:-10px;
+    left:50%;
+    transform:translateX(-50%);
+    width:0;height:0;
+    border-left:6px solid transparent;
+    border-right:6px solid transparent;
+    border-bottom:14px solid #fff;
+    z-index:5;
+  }
+
+  #main{display:flex;flex-direction:column;flex:1;min-height:0}
+  #boardArea{flex:1;min-height:0;overflow:auto}
+  #track{max-width:1200px;margin:8px auto;display:grid;grid-template-columns:repeat(20, 1fr);gap:4px}
+  .cell{min-height:44px;border:1px solid var(--border);background:#202028;color:#ddd;font-size:.7rem;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:8px;padding:3px}
+  .cell small{display:block;color:#cfcfcf;font-size:.6rem;margin-top:2px}
+  .cell.start{background:#1b5e20}
+  .cell.finish{background:#0d47a1}
+  .cell.payday{background:#2e7d32;color:#fff;font-weight:800}
+  .cell.tard{background:#5a189a}
+  .cell.bankruptcy{background:#b71c1c}
+  .cell.lottery{background:#795548}
+  .cell.idtheft{background:#263238}
+  .cell.extortion{background:#4e342e}
+  .cell.active{outline:3px dashed #ffd54f}
+
+  #playersDock{flex:0 0 170px;border-top:1px solid var(--border);background:#0e0e12}
+  #players{height:100%;max-width:1200px;margin:0 auto;padding:8px;display:flex;gap:12px;overflow:auto}
+  .card{min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px}
+  .title{font-weight:900;margin-bottom:6px}
+  .mono{font-variant-numeric:tabular-nums}
+  .delta{font-size:.8rem;color:#9ccc65;margin-left:6px}
+  #log{display:none}
+</style>
 </head>
 <body>
-  <div id="app">
-    <div id="board-wrap">
-      <div id="board"></div>
-      <div id="player-token"></div>
+<header>
+  <img id="logo" src="lowlife logo.jpg" alt="The Game of Lowlife">
+  <h1>The Game of Lowlife</h1>
+</header>
+
+<div id="app">
+  <section id="topbar">
+    <div id="controls">
+      <div id="lobbyControls" style="display:flex; flex-wrap:wrap; gap:10px;">
+        <button id="createGameBtn" class="btn" type="button">Create Game</button>
+        <label>Game Code:
+          <input id="gameCodeInput" type="text" placeholder="Enter Code" maxlength="4" style="width:100px;">
+        </label>
+        <button id="joinGameBtn" class="btn" type="button">Join Game</button>
+      </div>
+
+      <div id="gameLobby" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
+          <span style="color:var(--accent); font-weight:700;">Invite Code: <span id="displayGameCode"></span></span>
+      </div>
+      <label>Players:
+        <select id="numPlayers" disabled> <option>2</option><option>3</option><option>4</option>
+          <option>5</option><option>6</option><option>7</option><option>8</option>
+        </select>
+      </label>
+      <button id="buildNames" class="btn" type="button" disabled>Set Names</button>
+      <div id="namesRow" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      <button id="startBtn" class="btn" type="button" disabled>Start Game</button>
+      <button id="spinBtn" class="btn" type="button" disabled>SPIN</button>
+      <label>Voice: <select id="voiceSel"></select></label>
+      <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
+      <span id="status">Enter names, then Start Game.</span>
+
+      <div id="spinnerWrap" title="Spin result is read aloud">
+        <div id="spinner-container">
+          <div id="spinner-wheel"></div>
+          <div id="arrow"></div>
+        </div>
+      </div>
     </div>
-    <aside id="panel">
-      <div>
-        <h1>The Game of LowLife</h1>
-        <div class="subtitle">Working build with no animations.</div>
-      </div>
+  </section>
 
-      <div id="lobby">
-        <label>Host a game</label>
-        <div class="row">
-          <button id="create-game-btn">Create Game</button>
-          <div class="pill">Code: <strong id="game-code-display">—</strong></div>
-        </div>
-        <small>This code is local only in this build (no server calls).</small>
-      </div>
+  <section id="main">
+    <section id="boardArea">
+      <div id="track"></div>
+    </section>
+    <section id="playersDock">
+      <div id="players"></div>
+    </section>
+  </section>
+</div>
 
-      <div id="game-controls" style="display:none;">
-        <div id="status-line"></div>
-        <div id="spinner-row">
-          <button id="spin-btn">Spin</button>
-          <div id="roll-value">–</div>
-          <div class="pill">Pos: <strong id="position-display">1</strong> / 100</div>
-        </div>
-        <div class="row">
-          <div class="pill"><strong>$</strong> <span id="cash-display">0</span></div>
-          <div class="pill"><strong>Fam</strong> <span id="family-display">0</span></div>
-          <div class="pill"><strong>Turns</strong> <span id="turns-display">0</span></div>
-        </div>
-      </div>
+<section id="log"></section>
 
-      <div id="logs"></div>
-    </aside>
-  </div>
+<!-- SOCKET.IO -->
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script>
+  const socket = io("https://lowlife-server-1.onrender.com", { path:"/socket.io", transports:["websocket","polling"] });
 
-  <script>
-    // --- Basic state ---
-    const NUM_SQUARES = 100;
-    let position = 1;
-    let cash = 0;
-    let family = 0;
-    let turn = 0;
-    let skipNextTurn = false;
-    let gameStarted = false;
-
-    const boardEl = document.getElementById("board");
-    const tokenEl = document.getElementById("player-token");
-    const logsEl = document.getElementById("logs");
-    const gameCodeDisplay = document.getElementById("game-code-display");
-    const statusLine = document.getElementById("status-line");
-    const rollValueEl = document.getElementById("roll-value");
-    const posDisplay = document.getElementById("position-display");
-    const cashDisplay = document.getElementById("cash-display");
-    const familyDisplay = document.getElementById("family-display");
-    const turnsDisplay = document.getElementById("turns-display");
-    const spinBtn = document.getElementById("spin-btn");
-    const createGameBtn = document.getElementById("create-game-btn");
-    const lobbyEl = document.getElementById("lobby");
-    const gameControlsEl = document.getElementById("game-controls");
-
-    function generateGameCode() {
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      let code = "";
-      for (let i = 0; i < 5; i++) {
-        code += chars[Math.floor(Math.random() * chars.length)];
-      }
-      return code;
+  // --- Spinner numbers (centered) ---
+  const spinnerWheel = document.getElementById("spinner-wheel");
+  if (spinnerWheel) {
+    // Clear any old numbers
+    document.querySelectorAll(".spinner-number").forEach(e => e.remove());
+    for (let i = 0; i < 10; i++) {
+      const num = document.createElement("div");
+      num.className = "spinner-number";
+      num.textContent = i + 1;
+      num.style.transform = `rotate(${i * 36}deg)`;
+      spinnerWheel.appendChild(num);
     }
+  }
+</script>
 
-    // Approximate token positioning for 10x10 snake path
-    function updateTokenPosition() {
-      const rect = boardEl.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const cellW = rect.width / 10;
-      const cellH = rect.height / 10;
-      let idx = position - 1;
-      let row = Math.floor(idx / 10);
-      let col = idx % 10;
-      if (row % 2 === 1) col = 9 - col;
-      const x = rect.left + col * cellW + cellW / 2;
-      const y = rect.bottom - row * cellH - cellH / 2;
-      tokenEl.style.transform = "translate(" + x + "px," + y + "px)";
-    }
-
-    function log(msg, roll=null, square=null) {
-      const div = document.createElement("div");
-      div.className = "log-line";
-      let html = "";
-      if (roll !== null) html += "<span class='roll'>" + roll + "</span> → ";
-      html += msg;
-      if (square !== null) html += " (<span class='square'>#" + square + "</span>)";
-      div.innerHTML = html;
-      logsEl.appendChild(div);
-      logsEl.scrollTop = logsEl.scrollHeight;
-    }
-
-    function updateHUD() {
-      posDisplay.textContent = position;
-      cashDisplay.textContent = cash;
-      familyDisplay.textContent = family;
-      turnsDisplay.textContent = turn;
-    }
-
-    function handleSquare() {
-      // Minimal events: payday on 5 & 9, Lotto on 4, Bankruptcy on 99
-      if (position === 5 || position === 9) {
-        cash += 1000;
-        log("Payday! +$1000", null, position);
-      } else if (position === 4) {
-        log("Low-life Lotto (no animation in this build).", null, position);
-      } else if (position === 99) {
-        cash = 0;
-        log("BANKRUPTCY! All your cash is gone (no animation).", null, position);
-      } else if (position === 1) {
-        family += 1;
-        log("High school pregnancy: +1 family", null, position);
-      } else if (position === 2) {
-        cash += 500;
-        log("Sell weed at school: +$500", null, position);
-      } else if (position === 6) {
-        family -= 1;
-        log("Plan B: -1 family", null, position);
-      } else if (position === 8 || position === 15) {
-        skipNextTurn = true;
-        log("You will skip your next turn.", null, position);
-      } else if (position === 11) {
-        const lossRoll = Math.floor(Math.random()*6)+1;
-        const loss = lossRoll * 100;
-        cash -= loss;
-        log("Mugged at Walmart: -" + loss + " (" + lossRoll + " x $100)", null, position);
-      } else if (position === 12) {
-        cash -= 1000;
-        log("Sodomized by sex worker: -$1000", null, position);
-      } else if (position === 100) {
-        log("You reached the premium trailer and WIN!", null, position);
-        statusLine.textContent = "🎉 Premium trailer reached. Game over.";
-        spinBtn.disabled = true;
-      }
-    }
-
-    function doSpin() {
-      if (!gameStarted) return;
-      if (skipNextTurn) {
-        log("You skip this turn.");
-        skipNextTurn = false;
-        turn++;
-        updateHUD();
-        return;
-      }
-      const roll = Math.floor(Math.random()*6)+1;
-      rollValueEl.textContent = roll;
-      turn++;
-      let newPos = position + roll;
-      if (newPos > NUM_SQUARES) {
-        const over = newPos - NUM_SQUARES;
-        newPos = NUM_SQUARES - over;
-      }
-      position = newPos;
-      log("You rolled a " + roll, roll, position);
-      updateTokenPosition();
-      handleSquare();
-      updateHUD();
-    }
-
-    createGameBtn.addEventListener("click", function() {
-      const code = generateGameCode();
-      gameCodeDisplay.textContent = code;
-      gameStarted = true;
-      lobbyEl.style.opacity = 0.5;
-      lobbyEl.style.pointerEvents = "none";
-      gameControlsEl.style.display = "block";
-      statusLine.textContent = "Game started (local only). Code: " + code;
-      position = 1;
-      cash = 0;
-      family = 0;
-      turn = 0;
-      skipNextTurn = false;
-      logsEl.innerHTML = "";
-      rollValueEl.textContent = "–";
-      updateHUD();
-      setTimeout(updateTokenPosition, 50);
-      log("Game created with code " + code + ".");
-    });
-
-    spinBtn.addEventListener("click", doSpin);
-
-    window.addEventListener("resize", updateTokenPosition);
-
-    // initial placement
-    setTimeout(updateTokenPosition, 80);
-    updateHUD();
-  </script>
+<!-- Your existing game JavaScript continues below this comment -->
 </body>
 </html>
