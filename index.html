@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let lottoPot = 0;
   const LOTTO_BASE_WIN = 2000;
 
-  /* === Stable queue-based speech (prevents cutoffs and repeats) === */
+  /* === Stable queue-based speech === */
   const speechQueue=[]; let speaking=false; let voices=[], chosenVoice=null;
   function say(text){
     if(!('speechSynthesis' in window) || !text) return;
@@ -137,13 +137,12 @@ document.addEventListener('DOMContentLoaded', () => {
     u.onend=()=>playNext();
     try{ speechSynthesis.speak(u);}catch(e){ speaking=false; }
   }
+  
+  /* FIXED: NO CENSORSHIP */
   function speakSafeName(p){
-    // Keep UI label untouched; just soften for TTS to avoid “poem producer”
-    const map = {'Porn Producer':'adult film producer','Pornstar':'adult film star'};
-    const role = p.character?.name || '';
-    const safe = map[role] || role;
-    return `${p.name}, ${safe}`;
+    return `${p.name}, ${p.character?.name || ''}`;
   }
+
   function populateVoices(){
     if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
     voices=speechSynthesis.getVoices()||[]; voiceSel.innerHTML='';
@@ -157,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const logo = document.getElementById('logo');
   logo.addEventListener('error', () => { document.querySelector('header h1').style.display='block'; logo.style.display='none'; });
 
-  /* === Board & cards (same order you validated) === */
+  /* === Board & cards === */
   const EVENTS = [
     'Start',
     'High school pregnancy — gain a family member.',
@@ -261,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'Finish — first to cross gets $5,000 bonus.'
   ];
 
+  /* FIXED: 40 Funny Cards, 5 Payoff Cards */
   const TARD_CARDS = [
     'Grandma Joined a Cult – Lose 1 family member.',
     'Dad Arrested in the Dominican Republic – Lose 1 family member.',
@@ -297,11 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
     'Power Outage Party – Gain one social connection and $100.',
     'STD Scare – Lose a turn.',
     'Eviction Notice – Move back home. Gain 1 family member.',
-    'Payoff Card – Pay the person on your character card. Spin x 50.',
-    'Payoff Card – Pay the person on your character card. Spin x 50.',
-    'Payoff Card – Pay the person on your character card. Spin x 50.',
-    'Payoff Card – Pay the person on your character card. Spin x 50.',
-    'Payoff Card – Pay the person on your character card. Spin x 50.',
+    'Exposed on Maury Povich – You are NOT the father! Gain $500.',
+    'Win a wet t-shirt contest – Gain $200.',
+    'Cousin crashes on your couch – Gain 1 family member.',
+    'Shoplift Diapers – Save $50.',
+    'Forgot to run from the cops – Miss a turn.',
     'Payoff Card – Pay the person on your character card. Spin x 50.',
     'Payoff Card – Pay the person on your character card. Spin x 50.',
     'Payoff Card – Pay the person on your character card. Spin x 50.',
@@ -309,7 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
     'Payoff Card – Pay the person on your character card. Spin x 50.'
   ];
 
-  /* === Character set with your new pay amounts === */
   const CHARACTERS = [
     { name:'Porn Producer',     payday:2500, paysOff:['Gold Digger'] },
     { name:'Pornstar',          payday:2000, paysOff:['Porn Producer'] },
