@@ -1,218 +1,173 @@
-const WebSocket = require('ws');
-const PORT = process.env.PORT || 3000;
-const wss = https://lowlife-server-1.onrender.com
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lowlife</title>
+    <style>
+        body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; }
+        h1 { text-align: center; text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* Containers */
+        .screen { max-width: 600px; margin: 0 auto; border: 1px solid #000; padding: 20px; display: none; }
+        .visible { display: block; }
+        
+        /* Inputs & Buttons */
+        input { display: block; width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #000; }
+        button { display: block; width: 100%; padding: 15px; background: black; color: white; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        button:hover:not(:disabled) { opacity: 0.8; }
 
-const EVENTS = [ /* paste your full EVENTS array here exactly */ ];
-const TARD_CARDS = [ /* paste your full TARD_CARDS array here */ ];
-const CHARACTERS = [ /* paste your full CHARACTERS array */ ];
-const FINISH_POS = EVENTS.length - 1;
-const START_MONEY = 0;
-const START_FAMILY = 0;
+        /* Game Elements */
+        #game-info { border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; text-align: center; font-weight: bold; }
+        .player-row { display: flex; justify-content: space-between; padding: 10px; border: 1px solid #ccc; margin-bottom: 5px; align-items: center; }
+        .my-turn { border: 2px solid black; background: #f0f0f0; }
+        
+        #event-log { height: 200px; overflow-y: auto; border: 1px solid #000; padding: 10px; background: #fafafa; font-family: monospace; font-size: 14px; margin-top: 20px; }
+        #roll-box { font-size: 48px; text-align: center; margin: 20px 0; min-height: 60px; }
+    </style>
+</head>
+<body>
 
-const games = new Map();
+    <h1>Lowlife</h1>
 
-function shuffle(array) {
-  for(let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
+    <div id="lobby-screen" class="screen visible">
+        <h3>Join Game</h3>
+        <input type="text" id="username" placeholder="Enter Name">
+        <input type="text" id="game-id" placeholder="Game ID (Leave empty to create new)">
+        <button onclick="joinGame()">Enter Game</button>
+        <p id="status" style="text-align:center; margin-top:10px;"></p>
+    </div>
 
-function getRandomColor() {
-  const colors = ['#e53935','#8e24aa','#3949ab','#00acc1','#43a047','#fb8c00','#il'#7b1fa2'];
-  return colors[Math.floor(Math.random() * colors.length)];
-}
+    <div id="game-screen" class="screen">
+        <div id="game-info">Waiting for update...</div>
+        
+        <div id="roll-box"></div>
+        <button id="spin-btn" onclick="doSpin()" disabled>SPIN</button>
+        <button id="start-btn" onclick="doStart()" style="display:none; background:#444; margin-bottom:10px;">START GAME</button>
 
-wss.on('connection', ws => {
-  let game = null;
-  let playerId = null;
+        <div id="player-list"></div>
+        
+        <div id="event-log"></div>
+    </div>
 
-  ws.on('message', data => {
-    const msg = JSON.parse(data);
+    <script>
+        // AUTO-CONNECTED TO YOUR RENDER ADDRESS
+        const WS_URL = 'wss://lowlife-server-1.onrender.com';
+        let ws;
+        let myId = null;
 
-    if(msg.type === 'joinGame') {
-      let gameId = msg.gameId || null;
-      const playerName = msg.playerName || 'Lowlife';
+        // Initialize connection immediately
+        function connect() {
+            document.getElementById('status').innerText = "Connecting to server...";
+            ws = new WebSocket(WS_URL);
 
-      if(!gameId) gameId = Math.random().toString(36).substring(2,8).toUpperCase();
+            ws.onopen = () => {
+                document.getElementById('status').innerText = "Connected. Ready to join.";
+            };
 
-      if(!games.has(gameId)) {
-        games.set(gameId, {
-          state: 'lobby',
-          players: new Map(),
-          deck: shuffle([...TARD_CARDS]),
-          firstFinisher: null
-        });
-      }
-      game = games.get(gameId);
+            ws.onclose = () => {
+                document.getElementById('status').innerText = "Disconnected. Refresh page.";
+            };
 
-      playerId = Math.random().toString(36).substring(2,12);
-      game.players.set(playerId, {
-        id: playerId,
-        name: playerName,
-        color: getRandomColor(),
-        position: 0,
-        money: START_MONEY,
-        family: START_FAMILY,
-        character: null,
-        missedNextPayday: false,
-        missedTurns: 0
-      });
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+        }
 
-      ws.send(JSON.stringify({
-        type: 'welcome',
-        yourId: playerId,
-        gameId,
-        gameState: getGameState(game)
-      }));
+        function joinGame() {
+            const name = document.getElementById('username').value || "Player";
+            const gid = document.getElementById('game-id').value;
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'joinGame',
+                    playerName: name,
+                    gameId: gid
+                }));
+            } else {
+                alert("Not connected to server yet. Please wait.");
+            }
+        }
 
-      broadcast(game, {type: 'gameUpdate', gameState: getGameState(game)});
-    }
+        function doStart() {
+            ws.send(JSON.stringify({ type: 'startGame' }));
+        }
 
-    if(msg.type === 'startGame' && game && game.state === 'lobby' && game.players.size >= 2) {
-      game.state = 'playing';
-      const chars = shuffle([...CHARACTERS]);
-      let i = 0;
-      for(let p of game.players.values()) {
-        p.character = chars[i++ % chars.length];
-        p.money = START_MONEY;
-        p.family = START_FAMILY;
-        p.missedNextPayday = false;
-        p.missedTurns = 0;
-      }
-      game.turnIndex = Math.floor(Math.random() * game.players.size);
-      game.turnPlayerId = Array.from(game.players.keys())[game.turnIndex];
-      broadcast(game, {type: 'gameStarted', gameState: getGameState(game)});
-    }
+        function doSpin() {
+            ws.send(JSON.stringify({ type: 'spin' }));
+            document.getElementById('spin-btn').disabled = true;
+        }
 
-    if(msg.type === 'spin' && game && game.state === 'playing' && game.turnPlayerId === playerId && !game.currentRoll) {
-      const roll = Math.floor(Math.random() * 10) + 1;
-      game.currentRoll = roll;
-      broadcast(game, {type: 'roll', playerId, roll});
-      setTimeout(() => processMove(game, playerId, roll), 4500); // give client time to animate
-    }
-  });
+        function handleMessage(msg) {
+            if (msg.type === 'welcome') {
+                myId = msg.yourId;
+                document.getElementById('lobby-screen').classList.remove('visible');
+                document.getElementById('game-screen').classList.add('visible');
+                updateBoard(msg.gameState, msg.gameId);
+            }
+            
+            if (msg.type === 'gameUpdate' || msg.type === 'gameStarted') {
+                updateBoard(msg.gameState);
+            }
 
-  ws.on('close', () => {
-    if(game && playerId) {
-      game.players.delete(playerId);
-      if(game.players.size === 0) games.delete(game.gameId || gameId);
-      else broadcast(game, {type: 'gameUpdate', gameState: getGameState(game)});
-    }
-  });
-});
+            if (msg.type === 'roll') {
+                document.getElementById('roll-box').innerText = "🎲 " + msg.roll;
+            }
 
-function broadcast(game, msg) {
-  game.players.forEach(p => p.ws?.send(JSON.stringify(msg)));
-}
+            if (msg.type === 'message' || msg.type === 'tardCard') {
+                const log = document.getElementById('event-log');
+                const text = msg.type === 'tardCard' ? `CARD: ${msg.card}` : msg.text;
+                log.innerHTML += `<div>> ${text}</div>`;
+                log.scrollTop = log.scrollHeight;
+            }
+        }
 
-function getGameState(game) {
-  const players = {};
-  game.players.forEach(p => {
-    players[p.id] = {
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      character: p.character,
-      position: p.position,
-      money: p.money,
-      family: p.family
-    };
-  });
-  return {
-    state: game.state,
-    players,
-    turn: game.turnPlayerId,
-    deckCount: game.deck.length
-  };
-}
+        function updateBoard(state, gameId) {
+            if(gameId) document.getElementById('game-info').innerText = "GAME ID: " + gameId;
+            
+            // Show/Hide Start Button
+            const startBtn = document.getElementById('start-btn');
+            if (state.state === 'lobby') {
+                startBtn.style.display = 'block';
+                document.getElementById('roll-box').innerText = "Waiting to start...";
+            } else {
+                startBtn.style.display = 'none';
+            }
 
-function processMove(game, playerId, roll) {
-  const player = game.players.get(playerId);
-  if(player.missedTurns > 0) {
-    player.missedTurns--;
-    broadcast(game, {type:'message', text: `${player.name} misses turn`});
-    nextTurn(game);
-    game.currentRoll = null;
-    return;
-  }
+            // Update Player List
+            const list = document.getElementById('player-list');
+            list.innerHTML = '';
+            
+            const isMyTurn = state.turn === myId;
+            const spinBtn = document.getElementById('spin-btn');
+            
+            if (state.state === 'playing') {
+                spinBtn.disabled = !isMyTurn;
+                if(isMyTurn) document.getElementById('roll-box').innerText = "YOUR TURN";
+            }
 
-  if(player.missedNextPayday) player.missedNextPayday = false;
+            Object.values(state.players).forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'player-row';
+                if (state.turn === p.id && state.state === 'playing') div.classList.add('my-turn');
+                
+                div.innerHTML = `
+                    <div>
+                        <strong>${p.name}</strong><br>
+                        <small>${p.character ? p.character.name : '...'}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        $${p.money}<br>
+                        Space: ${p.position}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
 
-  player.position += roll;
-
-  let text = EVENTS[player.position % EVENTS.length];
-  let effects = [];
-
-  // PAYDAY
-  if(text.includes('Payday')) {
-    if(!player.missedNextPayday) player.money += player.character.payday;
-    else player.missedNextPayday = false;
-    effects.push('Payday');
-  }
-
-  // SIMPLE MONEY
-  const moneyMatch = text.match(/\$([\d,]+)/g);
-  if(moneyMatch) {
-    moneyMatch.forEach(m => {
-      const amount = parseInt(m.slice(1).replace(',',''));
-      if(text.includes('earn') || text.includes('win') || text.includes('found') || text.includes('bonus')) player.money += amount;
-      else player.money -= amount;
-    });
-  }
-
-  // FAMILY
-  if(text.includes('gain a family member') || text.includes('gain 1 family member')) player.family += text.includes('twins') ? 2 : 1;
-  if(text.includes('lose a family member')) player.family = Math.max(0, player.family -1);
-
-  // VIRAL / TIMES 100
-  if(text.includes('spin times 100') || text.includes('spin x 100')) player.money += roll * 100;
-
-  // TARD CARD
-  if(text.includes('Tard card')) {
-    if(game.deck.length === 0) game.deck = shuffle([...TARD_CARDS]);
-    const card = game.deck.pop();
-    broadcast(game, {type:'tardCard', playerId, card});
-    // apply simple card effects here too (payoff, family, etc)
-    if(card.includes('Payoff Card')) {
-      player.money -= roll * 50;
-      game.players.forEach(p => {
-        if(p.id !== playerId && p.character && player.character.paysOff.includes(p.character.name)) p.money += roll * 50;
-      });
-    }
-    if(card.includes('lose 1 family member')) player.family = Math.max(0, player.family -1);
-    if(card.includes('gain 1 family member')) player.family +=1;
-    // etc - add more if you want
-  }
-
-  // LOTTERY
-  if(text.includes('Lottery')) {
-    const needed = text.match(/spin ([\d or ]+) to win/)?.[1]?.split(' or ').map(Number) || [];
-    if(needed.includes(roll)) {
-      player.money += roll * 200;
-      effects.push('LOTTERY WIN! $' + roll*200);
-    }
-  }
-
-  if(text.includes('Finish') && !game.firstFinisher) {
-    player.money += 10000;
-    game.firstFinisher = playerId;
-    effects.push('FIRST TO FINISH — $10,000 BONUS!');
-  }
-
-  broadcast(game, {type:'gameUpdate', gameState: getGameState(game)});
-  if(effects.length) broadcast(game, {type:'message', text: effects.join(', ')});
-
-  game.currentRoll = null;
-  nextTurn(game);
-}
-
-function nextTurn(game) {
-  const ids = Array.from(game.players.keys());
-  game.turnIndex = (game.turnIndex + 1) % ids.length;
-  game.turnPlayerId = ids[game.turnIndex];
-  broadcast(game, {type:'gameUpdate', gameState: getGameState(game)});
-}
-
-console.log(`Lowlife server running on port ${PORT}`);
+        connect();
+    </script>
+</body>
+</html>
