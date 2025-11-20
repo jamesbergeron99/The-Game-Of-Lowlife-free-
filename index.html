@@ -75,7 +75,7 @@
       </span>
 
       <button id="spinBtn" class="btn" type="button" disabled>SPIN</button>
-      <label>Voice: <select id="voiceSel"></select></label>
+      <label>Voice: <select id="voiceSel" style="max-width:150px;"></select></label>
       <span style="color:#aaa">TARD deck: <span id="deckCount"></span></span>
       <span id="status">Host or Join to begin.</span>
 
@@ -157,32 +157,52 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${p.name}, ${p.character?.name || ''}`;
   }
 
-  /* FIXED: Better Voice Selection for iPhone */
+  /* FIXED: STRICT ENGLISH FILTER + SAMANTHA HUNTER */
   function populateVoices(){
     if(!('speechSynthesis' in window)){ voiceSel.innerHTML='<option>(no voices)</option>'; return; }
-    voices=speechSynthesis.getVoices()||[]; voiceSel.innerHTML='';
     
-    if(voices.length===0){ voiceSel.innerHTML='<option>(no voices)</option>'; chosenVoice=null; return; }
+    // Get all voices
+    let allVoices = speechSynthesis.getVoices();
+    
+    // 1. FILTER: ONLY SHOW ENGLISH VOICES
+    // This removes the 50+ foreign voices that sound like robots
+    voices = allVoices.filter(v => v.lang.startsWith('en'));
+    
+    voiceSel.innerHTML='';
+    
+    if(voices.length===0){ voiceSel.innerHTML='<option>Default</option>'; chosenVoice=null; return; }
 
-    // Populate dropdown
+    // Populate dropdown with only English options
     voices.forEach((v,i)=>{ 
         const o=document.createElement('option'); 
         o.value=i; 
-        o.textContent=`${v.name} — ${v.lang}`; 
+        o.textContent=`${v.name}`; // Cleaner name display
         voiceSel.appendChild(o); 
     });
 
-    // LOGIC: Find best English voice. 
-    // 1. Look for "Google US English" (Desktop Chrome)
-    // 2. Look for "Premium" or "Enhanced" or "Siri" (iPhone High Quality)
-    // 3. Fallback to any "en-US"
-    let idx = voices.findIndex(v => /Google US English/i.test(v.name));
-    if (idx === -1) idx = voices.findIndex(v => (/Premium|Enhanced|Siri/i.test(v.name) && /en-US/i.test(v.lang)));
-    if (idx === -1) idx = voices.findIndex(v => /en-US/i.test(v.lang));
-    if (idx === -1) idx = 0; // Last resort
+    // 2. AUTO-SELECT BEST VOICE
+    // On iPhone, "Samantha" is usually the high quality one. 
+    // "Fred" is the robot. We avoid Fred.
+    
+    let idx = -1;
+    
+    // A. Look for "Samantha" (Best iPhone voice)
+    idx = voices.findIndex(v => v.name.includes('Samantha'));
+    
+    // B. If no Samantha, look for "Karen" or "Daniel" (Good alternatives)
+    if (idx === -1) idx = voices.findIndex(v => /Karen|Daniel/i.test(v.name));
+    
+    // C. If nothing else, find Google US (Best Desktop voice)
+    if (idx === -1) idx = voices.findIndex(v => /Google US English/i.test(v.name));
+    
+    // D. Fallback to first English voice, but try to avoid "Fred"
+    if (idx === -1) idx = voices.findIndex(v => !v.name.includes('Fred'));
+    
+    // E. Last resort
+    if (idx === -1) idx = 0;
 
-    voiceSel.selectedIndex=idx; 
-    chosenVoice=voices[idx]||null;
+    voiceSel.selectedIndex = idx; 
+    chosenVoice = voices[idx] || null;
   }
 
   /* === Logo fallback === */
@@ -391,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(t.startsWith('extortion'))return'extortion';
     return'normal'; }
   function shortLabel(text){ const t=text.trim().toLowerCase();
-    if(t==='tard card')return'TARD';
+    if(t==='tard card')return'tard';
     if(isTruePayday(text))return'PAYDAY';
     if(t.startsWith('lottery'))return'LOTTO';
     if(t.includes('bankruptcy'))return'BANKRUPT';
