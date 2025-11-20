@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>The Game of Lowlife — Online</title>
+<title>The Game of Lowlife — v2.0</title>
 <style>
   :root{--bg:#0b0b0e;--ink:#f5f5f7;--muted:#b7b7c2;--accent:#ffd54f;--border:#2a2a35;--card:#15161d}
   *{box-sizing:border-box} html,body{height:100%}
@@ -125,6 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const speechQueue=[]; let speaking=false; let voices=[], chosenVoice=null;
   function say(text){
     if(!('speechSynthesis' in window) || !text) return;
+    // Wake up engine
+    speechSynthesis.resume();
     speechQueue.push(String(text));
     if(!speaking) playNext();
   }
@@ -135,10 +137,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const u=new SpeechSynthesisUtterance(t);
     if(chosenVoice) u.voice=chosenVoice;
     u.onend=()=>playNext();
+    u.onerror=()=>playNext(); 
     try{ speechSynthesis.speak(u);}catch(e){ speaking=false; }
   }
   
-  /* FIXED: NO CENSORSHIP */
   function speakSafeName(p){
     return `${p.name}, ${p.character?.name || ''}`;
   }
@@ -260,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
     'Finish — first to cross gets $5,000 bonus.'
   ];
 
-  /* FIXED: 40 Funny Cards, 5 Payoff Cards */
   const TARD_CARDS = [
     'Grandma Joined a Cult – Lose 1 family member.',
     'Dad Arrested in the Dominican Republic – Lose 1 family member.',
@@ -448,8 +449,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* === TARD effects === */
   function applyTardCardEffects(p, card, summary){
-    // clear any stale extra-spin handler so payoff can’t leak
+    // STRICT CLEANUP: Ensure no leftover "Payoff" handler exists from a previous turn
     window.__pendingExtraSpin = null;
+    
     const t=card.toLowerCase();
 
     if(t.includes('payoff card')){
@@ -469,6 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Standard Effects
     if(t.includes('lose 1 family')){ familyDelta(p,-1); summary.push('Family -1.'); }
     if(t.includes('gain 1 family')){ familyDelta(p,+1); summary.push('Family +1.'); }
     if(t.includes('skip the next turn')||t.includes('lose a turn')){ p.missNextTurn=true; summary.push('Will miss next turn.'); }
@@ -487,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* === Square logic (strict, single-flow) === */
   function applySquare(p, text, idx, summary){
-    // reset pending handlers per new square
+    // CLEANUP: Reset handlers immediately to prevent "ghost" payoffs
     window.__pendingExtraSpin = null;
     window.__pendingExtraCheck = null;
 
@@ -693,32 +696,45 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBoard(); renderPlayers(); highlightCell(0); placeAllTokens();
         spinBtn.disabled = (players[current].id !== MY_ID);
         statusEl.textContent = `Online game on. ${players[current].name} (${players[current].character.name}) to spin.`;
-        if(players[current].id === MY_ID){ say(`${speakSafeName(players[current])}. Your turn to spin.`); }
+        
+        /* CHANGED: Speak for EVERYONE so all devices hear who's up */
+        say(`${speakSafeName(players[current])}. Your turn to spin.`); 
+        
         tardIndex = 0; updateDeckCount();
         lottoPot = 0;
       });
 
       socket.on("turnChanged", ({ currentPlayerId })=>{
+        // IMPORTANT: Clear any ghost payoff handlers from prev turn
+        window.__pendingExtraSpin = null; 
+        window.__pendingExtraCheck = null;
+        
         const idx = players.findIndex(p => p.id === currentPlayerId);
         if (idx >= 0) current = idx;
         spinBtn.disabled = (players[current].id !== MY_ID);
         statusEl.textContent = `${players[current].name} (${players[current].character.name}) to spin.`;
-        if(players[current].id === MY_ID){ say(`${speakSafeName(players[current])}. Your turn to spin.`); }
+        
+        /* CHANGED: Speak for EVERYONE so all devices hear who's up */
+        say(`${speakSafeName(players[current])}. Your turn to spin.`);
       });
 
       socket.on("serverMoveSpin", ({ playerId, roll })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        spinning=true; spinBtn.disabled=true; say(`You spun a ${roll}.`); animateToNumber(roll);
+        
+        // Ensure we don't have leftover payoff handlers active
+        window.__pendingExtraSpin = null; 
+
+        spinning=true; spinBtn.disabled=true; say(`${p.name} spun a ${roll}.`); animateToNumber(roll);
         setTimeout(()=>{
           const summary=[]; advanceSteps(p, roll, summary);
-          if(summary.length) say(`Summary: ${summary.join(' ')}`);
+          if(summary.length) say(`Summary for ${p.name}: ${summary.join(' ')}`);
           spinning=false;
         }, 4000);
       });
 
       socket.on("serverExtraSpin", ({ playerId, roll, amount, multiplier })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        animateToNumber(roll); say(`Extra spin ×${multiplier}. You spun a ${roll}.`);
+        animateToNumber(roll); say(`Extra spin ×${multiplier}. ${p.name} spun a ${roll}.`);
         if(window.__pendingExtraSpin){ const fn=window.__pendingExtraSpin; window.__pendingExtraSpin=null; setTimeout(()=>fn(amount, roll), 900); }
         if(window.__pendingExtraCheck){ const fn2=window.__pendingExtraCheck; window.__pendingExtraCheck=null; setTimeout(()=>fn2(roll), 900); }
       });
