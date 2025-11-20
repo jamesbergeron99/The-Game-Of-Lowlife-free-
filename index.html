@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>The Game of Lowlife — v2.0</title>
+<title>The Game of Lowlife — Online</title>
 <style>
   :root{--bg:#0b0b0e;--ink:#f5f5f7;--muted:#b7b7c2;--accent:#ffd54f;--border:#2a2a35;--card:#15161d}
   *{box-sizing:border-box} html,body{height:100%}
@@ -123,22 +123,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* === Stable queue-based speech === */
   const speechQueue=[]; let speaking=false; let voices=[], chosenVoice=null;
+  
   function say(text){
     if(!('speechSynthesis' in window) || !text) return;
-    // Wake up engine
-    speechSynthesis.resume();
+    // CRITICAL FOR iOS: Resume context if suspended
+    if (speechSynthesis.paused) speechSynthesis.resume();
+    
     speechQueue.push(String(text));
     if(!speaking) playNext();
   }
+  
   function playNext(){
     if(speechQueue.length===0){ speaking=false; return; }
     speaking=true;
     const t=speechQueue.shift();
     const u=new SpeechSynthesisUtterance(t);
     if(chosenVoice) u.voice=chosenVoice;
-    u.onend=()=>playNext();
-    u.onerror=()=>playNext(); 
+    
+    // iOS sometimes garbage collects utterances too early. Keeping a ref helps.
+    window.currentUtterance = u; 
+    
+    u.onend=()=>{ speaking=false; playNext(); };
+    u.onerror=()=>{ speaking=false; playNext(); };
     try{ speechSynthesis.speak(u);}catch(e){ speaking=false; }
+  }
+
+  /* === iOS AUDIO UNLOCKER === */
+  /* This fires on Host/Join click to wake up the iPhone speech engine */
+  function unlockIOSAudio() {
+    if(!('speechSynthesis' in window)) return;
+    // Create a silent utterance
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0; 
+    u.rate = 10; 
+    speechSynthesis.speak(u);
   }
   
   function speakSafeName(p){
@@ -449,9 +467,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* === TARD effects === */
   function applyTardCardEffects(p, card, summary){
-    // STRICT CLEANUP: Ensure no leftover "Payoff" handler exists from a previous turn
+    // clear any stale extra-spin handler so payoff can’t leak
     window.__pendingExtraSpin = null;
-    
     const t=card.toLowerCase();
 
     if(t.includes('payoff card')){
@@ -471,7 +488,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Standard Effects
     if(t.includes('lose 1 family')){ familyDelta(p,-1); summary.push('Family -1.'); }
     if(t.includes('gain 1 family')){ familyDelta(p,+1); summary.push('Family +1.'); }
     if(t.includes('skip the next turn')||t.includes('lose a turn')){ p.missNextTurn=true; summary.push('Will miss next turn.'); }
@@ -490,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* === Square logic (strict, single-flow) === */
   function applySquare(p, text, idx, summary){
-    // CLEANUP: Reset handlers immediately to prevent "ghost" payoffs
+    // reset pending handlers per new square
     window.__pendingExtraSpin = null;
     window.__pendingExtraCheck = null;
 
@@ -696,45 +712,32 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBoard(); renderPlayers(); highlightCell(0); placeAllTokens();
         spinBtn.disabled = (players[current].id !== MY_ID);
         statusEl.textContent = `Online game on. ${players[current].name} (${players[current].character.name}) to spin.`;
-        
-        /* CHANGED: Speak for EVERYONE so all devices hear who's up */
-        say(`${speakSafeName(players[current])}. Your turn to spin.`); 
-        
+        if(players[current].id === MY_ID){ say(`${speakSafeName(players[current])}. Your turn to spin.`); }
         tardIndex = 0; updateDeckCount();
         lottoPot = 0;
       });
 
       socket.on("turnChanged", ({ currentPlayerId })=>{
-        // IMPORTANT: Clear any ghost payoff handlers from prev turn
-        window.__pendingExtraSpin = null; 
-        window.__pendingExtraCheck = null;
-        
         const idx = players.findIndex(p => p.id === currentPlayerId);
         if (idx >= 0) current = idx;
         spinBtn.disabled = (players[current].id !== MY_ID);
         statusEl.textContent = `${players[current].name} (${players[current].character.name}) to spin.`;
-        
-        /* CHANGED: Speak for EVERYONE so all devices hear who's up */
-        say(`${speakSafeName(players[current])}. Your turn to spin.`);
+        if(players[current].id === MY_ID){ say(`${speakSafeName(players[current])}. Your turn to spin.`); }
       });
 
       socket.on("serverMoveSpin", ({ playerId, roll })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        
-        // Ensure we don't have leftover payoff handlers active
-        window.__pendingExtraSpin = null; 
-
-        spinning=true; spinBtn.disabled=true; say(`${p.name} spun a ${roll}.`); animateToNumber(roll);
+        spinning=true; spinBtn.disabled=true; say(`You spun a ${roll}.`); animateToNumber(roll);
         setTimeout(()=>{
           const summary=[]; advanceSteps(p, roll, summary);
-          if(summary.length) say(`Summary for ${p.name}: ${summary.join(' ')}`);
+          if(summary.length) say(`Summary: ${summary.join(' ')}`);
           spinning=false;
         }, 4000);
       });
 
       socket.on("serverExtraSpin", ({ playerId, roll, amount, multiplier })=>{
         const p=players.find(x=>x.id===playerId); if(!p) return;
-        animateToNumber(roll); say(`Extra spin ×${multiplier}. ${p.name} spun a ${roll}.`);
+        animateToNumber(roll); say(`Extra spin ×${multiplier}. You spun a ${roll}.`);
         if(window.__pendingExtraSpin){ const fn=window.__pendingExtraSpin; window.__pendingExtraSpin=null; setTimeout(()=>fn(amount, roll), 900); }
         if(window.__pendingExtraCheck){ const fn2=window.__pendingExtraCheck; window.__pendingExtraCheck=null; setTimeout(()=>fn2(roll), 900); }
       });
@@ -764,6 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* === UI actions === */
   hostBtn.addEventListener('click', ()=>{
+    unlockIOSAudio(); // UNLOCK AUDIO
     const s=ensureSocket();
     s.emit("createRoom", {}, (res)=>{
       if(!res?.ok){ statusEl.textContent='Host failed.'; return; }
@@ -776,6 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   joinBtn.addEventListener('click', ()=>{
+    unlockIOSAudio(); // UNLOCK AUDIO
     const code=(mpCode.value||'').trim().toUpperCase(); if(code.length!==4){ statusEl.textContent='Enter a 4-letter code.'; return; }
     const s=ensureSocket();
     s.emit("joinRoom",{code,name:(mpName.value||'Player').trim(),tardDeckSeed:TARD_CARDS},(jr)=>{
