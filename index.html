@@ -491,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
         moneyDelta(p, winAmt);
         summary.push(`LOTTO WIN! +$${winAmt.toLocaleString()} (includes pot).`);
         say(`Lottery win! You get $${winAmt.toLocaleString()}.`);
+        playVideo('Lotto winner.mp4');
       }else{
         summary.push(`No lottery win (needed ${targets.join(' or ')}).`);
       }
@@ -633,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(t.includes('instant, no rescue') || t.includes("you're fucked")){
         const lost=p.money; p.money=0; p.lastMoneyDelta=-lost; renderPlayers();
         summary.push('Bankrupt. Lost all money.'); say(`${p.name}, you just went bankrupt. You lose all your money.`);
+        playVideo('Bankrupt.mp4');
       } else {
         let avoids=new Set();
         if(t.includes('spin a three')) avoids.add(3);
@@ -641,7 +643,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(avoids.size===0){ avoids.add(5); avoids.add(9); }
         window.__pendingRescueCheck = (roll)=>{
           if(avoids.has(roll)){ summary.push(`Avoided bankruptcy with ${roll}.`); say(`Avoided bankruptcy with ${roll}.`); }
-          else{ const lost=p.money; p.money=0; p.lastMoneyDelta=-lost; renderPlayers(); summary.push('Bankrupt. Lost all money.'); say(`${p.name}, you just went bankrupt. You lose all your money.`); }
+          else{ const lost=p.money; p.money=0; p.lastMoneyDelta=-lost; renderPlayers(); summary.push('Bankrupt. Lost all money.'); say(`${p.name}, you just went bankrupt. You lose all your money.`);
+        playVideo('Bankrupt.mp4'); }
         };
         ensureSocket().emit("requestRescueSpin",{code:ROOM_CODE,playerId:p.id},()=>{});
       }
@@ -858,10 +861,35 @@ document.addEventListener('DOMContentLoaded', () => {
   window.__pendingExtraCheck = null;
   window.__pendingRescueCheck = null;
 
+  
+function playVideo(src) {
+  const overlay = document.getElementById("videoOverlay");
+  const video = document.getElementById("eventVideo");
+
+  video.src = src;
+  overlay.style.display = "flex";
+
+  video.onended = () => {
+    overlay.style.display = "none";
+    video.src = "";
+  };
+
+  overlay.onclick = () => {
+    overlay.style.display = "none";
+    video.pause();
+    video.src = "";
+  };
+}
+
   /* boot */
   renderBoard(); renderPlayers(); shuffleTard();
   statusEl.textContent='Host or Join to begin.';
 });
 </script>
+
+<div id="videoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;">
+  <video id="eventVideo" width="80%" controls autoplay></video>
+</div>
+
 </body>
 </html>
